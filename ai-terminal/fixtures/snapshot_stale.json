@@ -1,0 +1,41 @@
+{
+  "schema": "aindle.snapshot.v2",
+  "generatedAt": "2026-09-05T11:50:00.000Z",
+  "hub": { "id": "demo", "label": "Demo Hub" },
+  "freshness": { "oldestHostMs": 39600000, "staleHosts": ["mbp"] },
+  "hosts": [
+    {
+      "id": "mbp",
+      "label": "Demo MBP",
+      "os": "darwin",
+      "seenAt": "2026-09-05T00:50:00.000Z",
+      "status": "stale"
+    }
+  ],
+  "subscriptions": [
+    {
+      "id": "claude-stale",
+      "tool": "Claude",
+      "label": "Claude",
+      "kind": "quota",
+      "source": "local",
+      "confidence": "cached",
+      "hostIds": ["mbp"],
+      "windows": [{ "key": "7d", "pct": 40, "resetsAt": "2026-09-07T00:00:00.000Z" }]
+    }
+  ],
+  "runs": [
+    {
+      "id": "stale-run",
+      "hostId": "mbp",
+      "tool": "Claude",
+      "title": "看起来像正在跑",
+      "project": "Octoooo",
+      "state": "active",
+      "initiator": "human",
+      "initiatorConfidence": "direct",
+      "stateConfidence": "derived"
+    }
+  ],
+  "monitorPeriod": "1h"
+}

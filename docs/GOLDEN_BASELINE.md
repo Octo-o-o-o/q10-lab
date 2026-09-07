@@ -58,4 +58,4 @@ SSH 不能让 OpenSSH 10.3 走 `ecdh-sha2-nistp256` + GCM。macOS `/etc/ssh/cryp
 
 ## 下一阶段
 
-先 Term49 → 验证 → 另一次 commit。BerryCore 再后。Q10 作为第二个 AI Monitor client，读圆屏同一套 `8790` / `aindle.snapshot.v2`，见 `SHARED_FOUNDATION.md`。不改圆屏仓库。
+本 tag 冻结的是干净官方面。之后 Term49 / BerryCore / 键盘监视器见 `BRINGUP.md`，不回写本 tag。

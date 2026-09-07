@@ -94,3 +94,5 @@
 - Java：OpenJDK 17.0.19（Homebrew），需 TLSv1 override
 - HTTP 代理存在：访问设备必须 `NO_PROXY=*`
 - SSH alias：只加了 `Host q10-usb`（`~/.ssh/config.d/q10-usb` + 顶行 `Include`），未改其他 Host
+
+本文件是 Phase 1 硬件/OS 快照。之后装上的 Term49 / BerryCore / 键盘监视器记在 `BRINGUP.md`，不回改上表。

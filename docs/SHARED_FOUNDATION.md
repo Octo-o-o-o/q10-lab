@@ -52,11 +52,27 @@ Aindle registry
 | 部署 | `idf.py flash` | `blackberry-deploy` + 已签名 BAR |
 | 日常控制 | 串口 ACK | `./scripts/q10-shell.sh` |
 
-Q10 要读 8790，Mac 必须把 hub **绑到 Q10 能路由到的地址**（USB `169.254.0.2` 或双方都在的 Wi-Fi LAN）。只听 `127.0.0.1` 时手机摸不到。BB10 浏览器 TLS 很老，第一版优先 Term49 里 `curl` HTTP，不要假设能开现代 HTTPS。
+Q10 要读 8790，Mac 必须把 hub **绑到 Q10 能路由到的地址**（USB `169.254.0.2` 或双方都在的 Wi-Fi LAN）。只听 `127.0.0.1` 时手机摸不到。BB10 浏览器 TLS 很老，第一版用设备自带 `python3.2` 拉 HTTP，不要假设能开现代 HTTPS。
+
+## 已实测（2026-09-07）
+
+Q10 USB SSH 用 `python3.2` 拉 `http://169.254.0.2:8790/snapshot.json` 成功：
+
+- schema `aindle.snapshot.v2`
+- hub `mini` / Mac mini
+- `staleHosts` 空
+- hosts / runs / subscriptions 都有真实条目
+
+本机 8790 当时同时听在 `127.0.0.1`、`169.254.0.2`、LAN。圆屏仍走串口；Q10 走 USB 网卡。同一份 JSON。
+
+复查：`./scripts/q10-snapshot.sh`
 
 ## 阶段
 
-1. Phase 1（本 tag）：USB / deploy / connect / SSH。已完成。
-2. 先 Term49，本机终端，不依赖 USB 也能探 QNX。
-3. 再评估 BerryCore，确认它动哪些系统组件后再装。
-4. 然后 Q10 client 读同一 8790 快照。不做小 ChatGPT。
+1. Phase 1：USB / deploy / connect / SSH。已完成（`q10-clean-baseline`）。
+2. Term49：已装，用户确认本机键盘 + 元模式可用。
+3. BerryCore userland **已装**到 `shared/misc/berrycore`。不 root、未装 Browser BAR。
+4. Q10 键盘监视器 **已落地**（Term49 / SSH TUI，`./scripts/q10-monitor.sh`）。主屏一键用 **`Z` → Term49**，见 `LAUNCH.md`。不做小 ChatGPT。
+5. 本机 PTT / 语音、Berry Browser、独立 sshd：**未对应**（语音要实机 API；Browser 要 root）。
+
+设备侧读 8790，**不读** Mac `/tmp/octoooo-mini-*/source-times.json`。没有 sidecar 时，缓存限额的年龄写「时间未知」，不用 Hub `generatedAt` 冒充采集时间。

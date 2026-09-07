@@ -8,4 +8,4 @@
 - 完成必须有证据：USB 枚举、ping、工具输出、SSH 回显、用户肉眼，是不同证据。
 - 网上 2013–2020 教程与 2025–2026 社区资料会冲突。冲突时并列来源，以这台真机为准。
 - 第一阶段目标是可重复的 USB / `blackberry-deploy` / `blackberry-connect` / SSH，不是尽快装软件。
-- Phase 1 已完成。用户已授权先装 Term49；BerryCore / AI Terminal 仍须另一次点头。未批准禁止 wipe / Autoloader / 升降级。
+- Phase 1 已完成。Term49、BerryCore userland、键盘监视器已装。未批准禁止 wipe / Autoloader / 升降级 / root。Berry Browser 要 root，不装。

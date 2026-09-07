@@ -61,3 +61,45 @@ Host 是 **Mac**。未改手机系统、未刷机、未 wipe、未装 Term49 / B
 - `-launchApp` 回报 `Info: done`。请在手机主屏确认图标和终端能开。
 - SSH 可见 `/accounts/1000/appdata/com.example.Term49…`。`/apps` 对 `devuser` 无权限。
 - BerryCore **仍未装**。
+
+### 2026-09-07 Term49 本机验收 + 8790 对应
+
+用户确认：Term49 能打字；左上角元模式绿 M；`k/j/h/l` 方向；`c` 再 `c` = Ctrl-C。
+
+Mac 侧对应：
+
+- `isAppRunning` = true
+- Q10 `python3.2` GET `http://169.254.0.2:8790/snapshot.json` → `aindle.snapshot.v2`，hub `mini`，hosts=1 / runs=3 / subs=11
+- 脚本：`./scripts/q10-snapshot.sh`
+
+### 2026-09-07 BerryCore v0.90.1（userland）
+
+用户要求不在 Term49 里手敲。用 USB SSH `devuser` 跑 `install.sh -y`，写到 `shared/misc`（HOME 是 `devuser`，对 SSH 有用）。
+
+- `INSTALL_EXIT=0`，约 98 包。日志 `logs/q10-berrycore-install.log`
+- `qpkg` / `curl 8.12.1` / `git` / `vim` 在 PATH
+- BerryCore `curl` 再拉 `http://169.254.0.2:8790/snapshot.json` → `aindle.snapshot.v2`
+- `/` 约 3.8G / 30%。未 root、未装 Browser BAR、未开 `sshd-on`、未下本机模型
+- `gcc.zip` 只有 134 字节，解压失败
+- Term49：`. /accounts/1000/shared/misc/use-berrycore.sh`
+
+详见 `BERRYCORE.md`。
+
+### 2026-09-07 键盘 AI Monitor
+
+与圆屏同一份 `aindle.snapshot.v2`。设备 `python3.2` TUI，不改圆屏仓库。
+
+- 脚本：`ai-terminal/q10_monitor.py`，入口 `./scripts/q10-monitor.sh`
+- Mac unittest 13 项通过（限额已用%、spend 不混、error 不是 0%、等你须 direct+needs_input）
+- 真机 `--once --all`：hub `Mac mini`，新鲜，主机 mbp ok，ASK 0，Gemini 不可用（不是 0%），DeepSeek 在余额栏
+- Term49：`/accounts/1000/shared/misc/q10mon`
+- 未做：PTT、Berry Browser、独立 sshd、设备侧对话
+
+详见 `ai-terminal/README.md`、`AI_TERMINAL_OPTIONS.md`、`LAUNCH.md`。
+
+### 2026-09-07 一键启动审查
+
+- Q10 **没有** KEYone 那种侧键。主屏字母快捷键是官方能力。
+- 出厂 `1`/`W` = 语音信箱。空键用 **`Z` → App Launch → Term49**。
+- SSH 不能写 Term49 `$HOME`。自动进监视器要在 Term49 里跑一次 `q10-autostart.sh`。
+- Mac：`./scripts/q10-launch.sh` 可 `-launchApp` Term49。

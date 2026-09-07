@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# High-level health. BerryCore fields stay unknown until that phase.
+# High-level health for the current lab phase.
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 # shellcheck disable=SC1091
 source "${ROOT}/scripts/q10-common.sh"
@@ -24,9 +24,20 @@ if [[ "${DEVICE_IP}" != "none" && -f "${KEY}" ]]; then
   else
     echo "SSH             FAIL (connect session missing?)"
   fi
+  remote="$("${ROOT}/scripts/q10-shell.sh" 'echo BC=$(test -d /accounts/1000/shared/misc/berrycore && echo yes || echo no); echo MON=$(test -f /accounts/1000/shared/misc/q10-monitor.py && echo yes || echo no); echo T49=$(ls -d /accounts/1000/appdata/com.example.Term49.* 2>/dev/null | wc -l)' 2>/dev/null || true)"
+  echo "BerryCore       $(printf '%s\n' "${remote}" | awk -F= '/^BC=/{print $2; exit}')"
+  echo "Term49          $(printf '%s\n' "${remote}" | awk -F= '/^T49=/{print ($2+0>0)?"yes":"no"; exit}')"
+  echo "Monitor         $(printf '%s\n' "${remote}" | awk -F= '/^MON=/{print $2; exit}')"
 else
   echo "SSH             not configured"
+  echo "BerryCore       unknown"
+  echo "Term49          unknown"
+  echo "Monitor         unknown"
 fi
 
-echo "BerryCore       not installed this phase"
-echo "Term49          not installed this phase"
+HUB="${Q10_MONITOR_URL:-http://169.254.0.2:8790/snapshot.json}"
+if curl --noproxy '*' -sS -m 3 -o /dev/null -w '' "${HUB}"; then
+  echo "Hub 8790        OK  ${HUB}"
+else
+  echo "Hub 8790        FAIL  ${HUB}"
+fi

@@ -6,13 +6,22 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 source "${ROOT}/scripts/q10-common.sh"
 q10_load_local_env
 
+FORCE_SYS=0
+if [[ "${1:-}" == "--system" ]]; then
+  FORCE_SYS=1
+  shift
+fi
 FULL="${1:-}"
 if [[ -z "${FULL}" ]]; then
-  echo "Usage: $0 <package-fullname>"
+  echo "Usage: $0 [--system] <package-fullname>"
   exit 1
 fi
-if [[ "${FULL}" == sys.* ]]; then
-  echo "Refusing to uninstall system package: ${FULL}"
+if [[ "${FULL}" == sys.* && "${FORCE_SYS}" != "1" ]]; then
+  echo "Refusing to uninstall system package without --system: ${FULL}"
+  exit 2
+fi
+if [[ "${FULL}" == *Term49* ]]; then
+  echo "Refusing to uninstall Term49"
   exit 2
 fi
 

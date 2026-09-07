@@ -1,0 +1,157 @@
+{
+  "schema": "aindle.snapshot.v2",
+  "generatedAt": "2026-09-05T11:59:50.000Z",
+  "hub": { "id": "demo", "label": "Demo Hub" },
+  "freshness": { "oldestHostMs": 3600000, "staleHosts": ["old-host"] },
+  "hosts": [
+    {
+      "id": "desk",
+      "label": "Demo Desk",
+      "os": "darwin",
+      "seenAt": "2026-09-05T11:59:00.000Z",
+      "status": "ok",
+      "stats": { "liveRuns": 1, "waitRuns": 1, "sessionsToday": 2, "tokensToday": "1.2M" }
+    },
+    {
+      "id": "old-host",
+      "label": "Old Laptop",
+      "os": "darwin",
+      "seenAt": "2026-09-04T20:00:00.000Z",
+      "status": "stale",
+      "stats": { "liveRuns": 9, "waitRuns": 0, "sessionsToday": 9, "tokensToday": "9.9M" }
+    }
+  ],
+  "subscriptions": [
+    {
+      "id": "claude-demo",
+      "tool": "Claude",
+      "label": "Claude · Demo",
+      "plan": "Max",
+      "kind": "quota",
+      "source": "local",
+      "confidence": "live",
+      "hostIds": ["desk"],
+      "windows": [
+        { "key": "5h", "pct": 12, "resetsAt": "2026-09-05T16:00:00.000Z" },
+        { "key": "7d", "pct": 64, "resetsAt": "2026-09-07T13:59:00.000Z" }
+      ]
+    },
+    {
+      "id": "cursor-demo",
+      "tool": "Cursor",
+      "label": "Cursor Demo",
+      "plan": "Pro",
+      "kind": "quota",
+      "source": "local",
+      "confidence": "cached",
+      "hostIds": ["desk"],
+      "windows": [
+        { "key": "三方", "pct": 100, "resetsAt": "2026-09-12T02:00:00.000Z" },
+        { "key": "自有", "pct": 22, "resetsAt": "2026-09-12T02:00:00.000Z" }
+      ]
+    },
+    {
+      "id": "gemini-demo",
+      "tool": "Gemini",
+      "label": "Gemini Demo",
+      "kind": "quota",
+      "source": "local",
+      "confidence": "error",
+      "hostIds": ["desk"],
+      "windows": []
+    },
+    {
+      "id": "glm-demo",
+      "tool": "GLM",
+      "label": "GLM Demo",
+      "kind": "quota",
+      "source": "local",
+      "confidence": "none",
+      "hostIds": ["desk"],
+      "windows": []
+    },
+    {
+      "id": "deepseek-demo",
+      "tool": "DeepSeek",
+      "label": "余额 ¥12.34",
+      "plan": "API",
+      "kind": "spend",
+      "source": "local",
+      "confidence": "cached",
+      "hostIds": ["desk"],
+      "windows": [{ "key": "预算", "pct": 19 }]
+    },
+    {
+      "id": "kimi-demo",
+      "tool": "Kimi",
+      "label": "Kimi Demo",
+      "kind": "quota",
+      "source": "local",
+      "confidence": "live",
+      "hostIds": ["desk"],
+      "windows": [
+        { "key": "5h", "pct": 0, "resetsAt": "2026-09-05T16:30:00.000Z" },
+        { "key": "7d", "pct": 8, "resetsAt": "2026-09-11T15:00:00.000Z" }
+      ]
+    }
+  ],
+  "runs": [
+    {
+      "id": "octoooo-live",
+      "hostId": "desk",
+      "tool": "Claude",
+      "title": "Contract upgrade 1.1.0",
+      "project": "Octoooo",
+      "state": "active",
+      "initiator": "human",
+      "initiatorConfidence": "direct",
+      "stateConfidence": "derived"
+    },
+    {
+      "id": "wait-live",
+      "hostId": "desk",
+      "tool": "Claude",
+      "title": "需要你确认下一步",
+      "project": "DemoApp",
+      "state": "wait",
+      "initiator": "human",
+      "initiatorConfidence": "direct",
+      "stateConfidence": "direct",
+      "waitReason": "needs_input"
+    },
+    {
+      "id": "fake-wait",
+      "hostId": "desk",
+      "tool": "Grok",
+      "title": "derived wait 不能标等你",
+      "project": "Other",
+      "state": "wait",
+      "initiator": "human",
+      "initiatorConfidence": "derived",
+      "stateConfidence": "derived"
+    },
+    {
+      "id": "stale-active",
+      "hostId": "old-host",
+      "tool": "Claude",
+      "title": "过期主机上的活跃会话",
+      "project": "Legacy",
+      "state": "active",
+      "initiator": "human",
+      "initiatorConfidence": "direct",
+      "stateConfidence": "derived"
+    },
+    {
+      "id": "long-title",
+      "hostId": "desk",
+      "tool": "Claude",
+      "title": "这是一条用来检查圆屏裁剪的超长中文任务标题需要被省略号截断而不是画出圆外ABCDEFG",
+      "project": "RoundScreenDemo",
+      "state": "idle",
+      "initiator": "human",
+      "initiatorConfidence": "direct",
+      "stateConfidence": "derived"
+    }
+  ],
+  "monitorPeriod": "1h"
+}
