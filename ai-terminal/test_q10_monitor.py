@@ -20,8 +20,21 @@ from q10_monitor import (
     hub_link_kind,
     hub_ports,
     mark_offline,
+    header_alert,
+    merge_ask_history,
     overlay_source_times,
+    page_window,
+    quota_item_visible,
     read_last_hub_url,
+    remember_attention,
+    _PROJ_ABBR,
+    _TOOL_ABBR,
+    abbrev_token,
+    filter_tasks,
+    short_token,
+    task_card_lines,
+    task_filter_for_key,
+    task_row_lines,
     render_page,
     replace_url_port,
     resolve_hub_urls,
@@ -92,12 +105,10 @@ class AdapterTests(unittest.TestCase):
 
     def test_error_and_missing_are_not_zero(self):
         model = adapt(_load("snapshot_demo.json"), now=NOW, demo=True, quota_limit=10)
-        gemini = next(i for i in model["quota_items"] if i["tool"] == "Gemini")
-        glm = next(i for i in model["quota_items"] if i["tool"] == "GLM")
-        self.assertEqual(gemini["status_label"], "不可用")
-        self.assertEqual(gemini["windows"], [])
-        self.assertEqual(glm["status_label"], "无数据")
-        self.assertEqual(glm["windows"], [])
+        tools = [i["tool"] for i in model["quota_items"]]
+        self.assertNotIn("Gemini", tools)
+        self.assertNotIn("GLM", tools)
+        self.assertTrue(all(quota_item_visible(i) for i in model["quota_items"]))
         kimi = next(i for i in model["quota_items"] if i["tool"] == "Kimi")
         self.assertTrue(any(w["used_pct"] == 0 and w["used_label"] == "已用 0%" for w in kimi["windows"]))
 
@@ -232,15 +243,14 @@ class AdapterTests(unittest.TestCase):
         mixed = next(i for i in model["quota_items"] if i["tool"] == "Mixed")
         missing = next(i for i in model["quota_items"] if i["tool"] == "MissingHosts")
         ghost = next(i for i in model["quota_items"] if i["tool"] == "Ghost")
-        err = next(i for i in model["quota_items"] if i["tool"] == "StaleError")
+        tools = [i["tool"] for i in model["quota_items"]]
+        self.assertNotIn("StaleError", tools)
         self.assertEqual(mixed["status_label"], "旧数据")
         self.assertEqual(mixed["windows"][0]["used_pct"], 41)
         self.assertEqual(missing["status_label"], "未知")
         self.assertEqual(missing["windows"][0]["used_pct"], 17)
         self.assertEqual(ghost["status_label"], "未知")
         self.assertEqual(ghost["windows"][0]["used_pct"], 9)
-        self.assertEqual(err["status_label"], "不可用")
-        self.assertEqual(err["windows"], [])
 
     def test_overlay_source_times_binds_collected_at(self):
         snap = _load("snapshot_demo.json")
@@ -277,13 +287,15 @@ class AdapterTests(unittest.TestCase):
         tasks = render_page(model, "tasks", width=42)
         quota = render_page(model, "quota", width=42)
         self.assertIn("任务", tasks)
-        self.assertIn("等你", tasks)
-        self.assertIn("人手", tasks)
+        self.assertIn("进行", tasks)
+        self.assertIn("后台", tasks)
+        self.assertNotIn("新鲜", tasks)
+        self.assertNotIn("采集", tasks)
+        self.assertNotIn("人手", tasks)
         self.assertNotIn("ASK/", tasks)
         self.assertNotIn("+--", tasks)
-        self.assertIn("正常", tasks)
-        self.assertIn("失败", quota)
-        self.assertIn("缺失", quota)
+        self.assertNotIn("Gemini", quota)
+        self.assertNotIn("GLM", quota)
         self.assertNotIn("| ERR|", quota)
         self.assertNotIn("+--", quota)
         self.assertIn("t刷新", tasks)
@@ -305,22 +317,23 @@ class AdapterTests(unittest.TestCase):
         page = render_page(model, "quota", width=42)
         self.assertIn("3rd", page)
         self.assertIn("own", page)
-        self.assertIn("ERR", page)
-        self.assertIn("NONE", page)
+        self.assertNotIn("Gemini", page)
+        self.assertNotIn("GLM", page)
         self.assertIn("DeepSeek", page)
         self.assertNotIn("+--", page)
         self.assertNotIn("collect failed", page)
-        gemini = next(i for i in model["quota_items"] if i["tool"] == "Gemini")
-        self.assertEqual(gemini["windows"], [])
+        tools = [i["tool"] for i in model["quota_items"]]
+        self.assertNotIn("Gemini", tools)
 
     def test_english_status_and_tasks_are_tables(self):
         model = adapt(_load("snapshot_demo.json"), now=NOW, demo=True, task_limit=10, lang="en")
         tasks = render_page(model, "tasks", width=42)
         ask = render_page(model, "ask", width=42)
-        self.assertIn("need", tasks)
-        self.assertIn("Demo Desk", tasks)
-        self.assertIn("YOU", tasks)
-        self.assertIn("OLD", tasks)
+        self.assertIn("run", tasks)
+        self.assertIn("bg", tasks)
+        self.assertNotIn("fresh", tasks.lower())
+        self.assertIn("CLD", tasks)
+        self.assertIn("Arun", tasks)
         self.assertNotIn("+--", tasks)
         self.assertIn("1 QUOTA  2 TASK  3 ASK", tasks)
 
@@ -501,11 +514,11 @@ class AdapterTests(unittest.TestCase):
 
     def test_height_trims_rows_with_hint(self):
         model = adapt(_load("snapshot_demo.json"), now=NOW, demo=True)
-        out = render_page(model, "quota", width=36, height=12)
-        self.assertIn("另有", out)
-        self.assertLessEqual(len(out.splitlines()), 12)
+        out = render_page(model, "quota", width=36, height=10)
+        self.assertIn("第", out)
+        self.assertLessEqual(len(out.splitlines()), 10)
         full = render_page(model, "quota", width=36)
-        self.assertGreater(len(full.splitlines()), 12)
+        self.assertGreater(len(full.splitlines()), 10)
 
     def test_english_layout_is_ascii(self):
         set_ui_lang("en")
@@ -515,6 +528,152 @@ class AdapterTests(unittest.TestCase):
         self.assertEqual(lines[1], "-" * 42)
         self.assertIn("#", out)
         set_ui_lang("zh")
+
+    def test_header_hides_fresh_shows_alert(self):
+        model = adapt(_load("snapshot_demo.json"), now=NOW, demo=True)
+        self.assertEqual(header_alert(model), "")
+        head = render_page(model, "tasks", width=42).splitlines()[0]
+        self.assertIn("进行", head)
+        self.assertIn("后台", head)
+        self.assertNotIn("新鲜", head)
+        offline = mark_offline(model)
+        self.assertEqual(header_alert(offline), "离线")
+        bad = adapt({"schema": "nope"}, now=NOW)
+        self.assertEqual(header_alert(bad), "不可用")
+
+    def test_task_row_abbrev_and_wrap(self):
+        item = {
+            "title": "为humanusage项目重新设计官网并部署至Cloudflare",
+            "project": "YouUsage",
+            "tool": "ZCode",
+            "state": "active",
+            "waiting_you": False,
+        }
+        lines = task_row_lines(item, 36)
+        self.assertEqual(len(lines), 1)
+        self.assertTrue(lines[0].startswith("  为"))
+        self.assertFalse(lines[0].startswith("ZCD"))
+        self.assertTrue(lines[0].endswith("YU·ZCD"))
+        self.assertFalse(lines[0].endswith("Clo"))
+        self.assertIn("…", lines[0])
+        self.assertLessEqual(len(lines[0]), 36)
+        short = task_row_lines(
+            {
+                "title": "审查并优化设备项目",
+                "project": "waveshare-ESP32-S3-Touch-AMOLED-1.75C",
+                "tool": "Codex",
+                "state": "active",
+            },
+            36,
+        )
+        self.assertEqual(len(short), 1)
+        self.assertEqual(short[0], "  审查并优化设备项目".ljust(30) + "WS·CDX")
+        wrapped = task_row_lines(
+            {
+                "title": "(2) BlackBerry Q10 development lab",
+                "project": "lab",
+                "tool": "Cursor",
+                "state": "idle",
+            },
+            36,
+        )
+        self.assertEqual(len(wrapped), 1)
+        self.assertTrue(wrapped[0].startswith("  (2) BlackBerry"))
+        self.assertTrue(wrapped[0].endswith("lab·CUR"))
+        dupe = task_row_lines(
+            {"title": "OctoDesk", "project": "OctoDesk", "tool": "Claude", "state": "active"},
+            36,
+        )
+        self.assertEqual(dupe[0], "  OctoDesk".ljust(33) + "CLD")
+        bare = task_row_lines(
+            {
+                "title": "Contexpect 接续实施下一阶段",
+                "project": "Contexpect",
+                "tool": "Claude",
+                "state": "active",
+                "waiting_you": True,
+            },
+            36,
+        )
+        self.assertEqual(bare[0], "● 接续实施下一阶段".ljust(29) + "Ctx·CLD")
+        alias = task_row_lines(
+            {
+                "title": "Contexpect 接续实施下一阶段",
+                "project": "ContextView",
+                "tool": "Claude",
+                "state": "active",
+                "waiting_you": True,
+            },
+            36,
+        )
+        self.assertEqual(alias[0], bare[0])
+        marked = task_row_lines(
+            {"title": "Fix chat create request lost", "project": "OctoDesk", "tool": "Grok",
+             "state": "active", "waiting_you": True},
+            36,
+        )
+        self.assertEqual(marked[0], "● Fix chat create…".ljust(23) + "OctoDesk·GROK")
+        self.assertEqual(short_token("Grok", _TOOL_ABBR, 4), "GROK")
+        self.assertEqual(short_token("OctoDesk-t115-phase0", _PROJ_ABBR, 8), "OctoDesk")
+        self.assertEqual(abbrev_token("OctoWorkFlow", 4, _PROJ_ABBR), "OWF ")
+        self.assertEqual(abbrev_token("ContextView", 4, _PROJ_ABBR), "Ctx ")
+        self.assertEqual(
+            abbrev_token("waveshare-ESP32-S3-Touch-AMOLED-1.75C", 4, _PROJ_ABBR),
+            "WS  ",
+        )
+        self.assertEqual(task_filter_for_key("a"), "active")
+        shown = filter_tasks(
+            [{"state": "active"}, {"state": "idle"}, {"state": "done"}],
+            "active",
+        )
+        self.assertEqual([i["state"] for i in shown], ["active"])
+
+    def test_quota_hides_legend_line(self):
+        model = adapt(_load("snapshot_demo.json"), now=NOW, demo=True)
+        quota = render_page(model, "quota", width=36)
+        self.assertNotIn("失败/缺失不是 0%", quota)
+        self.assertNotIn("花费≠限额", quota)
+        self.assertIn("DeepSeek", quota)
+
+    def test_page_window_pages(self):
+        items = list(range(5))
+        shown, page_i, n_pages = page_window(items, 1, 2)
+        self.assertEqual(n_pages, 3)
+        self.assertEqual(page_i, 1)
+        self.assertEqual(shown, [2, 3])
+
+    def test_ask_history_keeps_processed(self):
+        fd, path = tempfile.mkstemp()
+        os.close(fd)
+        os.remove(path)
+        old = os.environ.get("Q10_ASK_HISTORY_FILE")
+        os.environ["Q10_ASK_HISTORY_FILE"] = path
+        try:
+            current = [{"id": "a1", "title": "请确认", "project": "P", "tool": "Claude"}]
+            first = merge_ask_history(current, [], True)
+            self.assertEqual(first[0]["open"], True)
+            later = merge_ask_history([], first, True)
+            self.assertEqual(later[0]["open"], False)
+            self.assertEqual(later[0]["title"], "请确认")
+            model = adapt(_load("snapshot_demo.json"), now=NOW, demo=True)
+            remember_attention(model)
+            self.assertTrue(model["ask_open"] >= 1)
+            ask = render_page(model, "ask", width=36)
+            self.assertIn("待处理", ask)
+            self.assertIn("●", ask)
+            model["attention"] = []
+            model["offline"] = False
+            model["schema_ok"] = True
+            remember_attention(model)
+            ask2 = render_page(model, "ask", width=36)
+            self.assertIn("已处理", ask2)
+        finally:
+            if old is None:
+                os.environ.pop("Q10_ASK_HISTORY_FILE", None)
+            else:
+                os.environ["Q10_ASK_HISTORY_FILE"] = old
+            if os.path.isfile(path):
+                os.remove(path)
 
 
 if __name__ == "__main__":

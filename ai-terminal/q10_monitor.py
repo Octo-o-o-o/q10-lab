@@ -18,6 +18,8 @@ import time
 from datetime import datetime
 
 SNAPSHOT_SCHEMA = "aindle.snapshot.v2"
+ASK_HISTORY_SCHEMA = "q10.ask-history.v1"
+ASK_HISTORY_MAX = 24
 # Aindle 合同：AINDLE_PORT 默认 8787。8790 只作旧客户端回退，不在本仓库另起 Hub。
 HUB_PORT = 8787
 HUB_LEGACY_PORT = 8790
@@ -26,6 +28,56 @@ STALE_AFTER_MS = 5 * 60 * 1000
 PAGES = ("quota", "tasks", "ask")
 # Q10 数字印在字母上。不按 Alt 时 W/E/R/S = 1/2/3/4。
 # 现三页：4/S 与 3/R 都进待处理。刷新不用 R，否则挡住第 3 页。
+TASK_FILTERS = ("active", "idle", "done", "all")
+TASK_FILTER_DEFAULT = "active"
+TASK_AGENT_W = 4
+TASK_PROJ_W = 8
+_TASK_FILTER_KEYS = {
+    "a": "active",
+    "A": "active",
+    "i": "idle",
+    "I": "idle",
+    "d": "done",
+    "D": "done",
+    "u": "all",
+    "U": "all",
+}
+_TOOL_ABBR = {
+    "Claude": "CLD",
+    "Codex": "CDX",
+    "Cursor": "CUR",
+    "Gemini": "GEM",
+    "Grok": "GROK",
+    "GLM": "GLM",
+    "Kimi": "KIMI",
+    "DeepSeek": "DSK",
+    "ZCode": "ZCD",
+    "Aindle": "AIN",
+}
+_PROJ_ABBR = {
+    "Octoooo": "Octo",
+    "Aindle": "Aindle",
+    "lab": "lab",
+    "OctoDesk": "OctoDesk",
+    "OctoWorkFlow": "OWF",
+    "OctoWork": "OWF",
+    "worktree": "wt",
+    "ContextVista": "Ctx",
+    "ContextView": "Ctx",
+    "Context": "Ctx",
+    "Contexpect": "Ctx",
+    "SayDo": "SayDo",
+    "saydo-p": "SayDo",
+    "YouUsage": "YU",
+    "YoUsage": "YU",
+    "waveshare": "WS",
+    "Waveshare": "WS",
+    "DemoApp": "Demo",
+    "Legacy": "Leg",
+    "Other": "Oth",
+    "RoundScreenDemo": "RSD",
+    "演示": "Demo",
+}
 _PAGE_BY_KEY = {
     "1": "quota",
     "w": "quota",
@@ -101,6 +153,15 @@ _UI = {
         "spend_head": "花费（非限额）",
         "more_n": "另有 {0} 项",
         "more_n_tasks": "另有 {0} 条",
+        "header_run": "进行{0} · 后台{1}",
+        "page_hint": "第{0}/{1}页 · j下 k上",
+        "flt_active": "进行",
+        "flt_idle": "空闲",
+        "flt_done": "完成",
+        "flt_all": "全部",
+        "no_filter_tasks": "没有这类任务 · a进行 i空闲 d完成 u全部",
+        "ask_open": "待处理",
+        "ask_done": "已处理",
         "no_tasks": "没有任务",
         "no_ask": "没有待处理",
         "on_computer": "请在电脑处理",
@@ -126,7 +187,6 @@ _UI = {
         "note_short": "已用% · 账户不加总 · 花费≠限额",
         "cell_err": "失败",
         "cell_none": "缺失",
-        "quota_legend": "失败/缺失不是 0% · 花费≠限额",
         "st_you": "等你",
         "st_run": "进行",
         "st_wait": "等待",
@@ -201,6 +261,15 @@ _UI = {
         "spend_head": "SPEND != quota",
         "more_n": "{0} more",
         "more_n_tasks": "{0} more",
+        "header_run": "run{0} · bg{1}",
+        "page_hint": "p{0}/{1} · j/k",
+        "flt_active": "run",
+        "flt_idle": "idl",
+        "flt_done": "dn",
+        "flt_all": "all",
+        "no_filter_tasks": "no tasks in filter · a/i/d/u",
+        "ask_open": "OPEN",
+        "ask_done": "done",
         "no_tasks": "no tasks",
         "no_ask": "nothing waiting",
         "on_computer": "handle on the computer",
@@ -226,7 +295,6 @@ _UI = {
         "note_short": "used% · accounts not summed · spend!=quota",
         "cell_err": "ERR",
         "cell_none": "NONE",
-        "quota_legend": "ERR/NONE != 0%  spend != quota",
         "st_you": "YOU",
         "st_run": "RUN",
         "st_wait": "WAIT",
@@ -629,6 +697,14 @@ def _quota_item(sub, now, stale_ids, known_ids, seen_map):
     }
 
 
+def quota_item_visible(item):
+    if not item or not item.get("is_quota"):
+        return False
+    if item.get("confidence") in ("error", "none"):
+        return False
+    return bool(item.get("windows"))
+
+
 def _waiting_you(run):
     return (
         run.get("state") == "wait"
@@ -794,6 +870,8 @@ def adapt(
         if item["kind"] == "spend" or not item["is_quota"]:
             if item["kind"] == "spend" or item["confidence"] == "error":
                 spend_all.append(item)
+            continue
+        if not quota_item_visible(item):
             continue
         quota_all.append(item)
 
@@ -1185,6 +1263,103 @@ def write_last_hub_url(url):
     return True
 
 
+def ask_history_path():
+    hinted = os.environ.get("Q10_ASK_HISTORY_FILE", "").strip()
+    if hinted:
+        return hinted
+    if os.path.isdir("/accounts/1000/shared/misc"):
+        return "/accounts/1000/shared/misc/q10-ask-history.json"
+    return os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), "..", "local-config", "q10-ask-history.json"
+    )
+
+
+def _ask_record(item, open_flag):
+    return {
+        "id": str(item.get("id") or ""),
+        "title": str(item.get("title") or ""),
+        "project": str(item.get("project") or ""),
+        "tool": str(item.get("tool") or ""),
+        "computer_hint": bool(item.get("computer_hint")),
+        "demo": bool(item.get("demo")),
+        "open": bool(open_flag),
+    }
+
+
+def read_ask_history():
+    path = ask_history_path()
+    try:
+        data = load_json_file(path)
+    except Exception:
+        return []
+    if not isinstance(data, dict) or data.get("schema") != ASK_HISTORY_SCHEMA:
+        return []
+    out = []
+    for item in data.get("items") or []:
+        if isinstance(item, dict) and item.get("id"):
+            out.append(_ask_record(item, item.get("open", True)))
+    return out
+
+
+def write_ask_history(items):
+    path = ask_history_path()
+    parent = os.path.dirname(path)
+    payload = {"schema": ASK_HISTORY_SCHEMA, "items": []}
+    for item in items or []:
+        if item.get("id"):
+            payload["items"].append(_ask_record(item, item.get("open", True)))
+    try:
+        if parent and not os.path.isdir(parent):
+            os.makedirs(parent)
+        fh = open(path, "w")
+        try:
+            fh.write(json.dumps(payload, ensure_ascii=True))
+        finally:
+            fh.close()
+    except Exception:
+        return False
+    return True
+
+
+def merge_ask_history(current, stored, live):
+    by_id = {}
+    for item in stored or []:
+        iid = str(item.get("id") or "")
+        if iid:
+            by_id[iid] = _ask_record(item, item.get("open", True))
+    now_ids = set()
+    for item in current or []:
+        iid = str(item.get("id") or "")
+        if not iid:
+            continue
+        now_ids.add(iid)
+        by_id[iid] = _ask_record(item, True)
+    if live:
+        for iid, row in by_id.items():
+            if iid not in now_ids:
+                row["open"] = False
+    items = list(by_id.values())
+    items.sort(key=lambda row: (0 if row.get("open") else 1, row.get("title") or ""))
+    opened = [row for row in items if row.get("open")]
+    closed = [row for row in items if not row.get("open")]
+    keep = ASK_HISTORY_MAX - len(opened)
+    if keep < 0:
+        keep = 0
+    return opened + closed[:keep]
+
+
+def remember_attention(model):
+    if not model:
+        return model
+    live = bool(model.get("schema_ok") and not model.get("offline"))
+    merged = merge_ask_history(model.get("attention") or [], read_ask_history(), live)
+    if live:
+        write_ask_history(merged)
+    model["attention"] = merged
+    model["ask_open"] = len([row for row in merged if row.get("open")])
+    return model
+
+
 def on_qnx_device():
     if os.path.isdir("/accounts/1000/shared/misc"):
         return True
@@ -1484,7 +1659,6 @@ def flatten_quota_rows(items):
         tool = quota_tool_cell(item, used)
         wins = item.get("windows") or []
         if not wins:
-            rows.append((item, None, tool))
             continue
         for win in wins:
             rows.append((item, win, tool))
@@ -1532,10 +1706,25 @@ def term_width(default=36):
     return default
 
 
+def header_alert(model):
+    if model.get("offline"):
+        return t("offline")
+    if not model.get("schema_ok"):
+        return t("unavailable")
+    fresh = model.get("freshness") or ""
+    if fresh in (t("unavailable"), t("offline"), t("error"), t("stale"), t("none")):
+        return fresh
+    return ""
+
+
 def _page_header(model, page, width):
     title = t(page) if page in PAGES else page
     if page == "ask":
-        n_ask = len(model.get("attention") or [])
+        n_ask = model.get("ask_open")
+        if n_ask is None:
+            n_ask = len(
+                [item for item in (model.get("attention") or []) if item.get("open", True)]
+            )
         if n_ask:
             title = "{0}({1})".format(title, n_ask)
     hub = model.get("hub_label") or ""
@@ -1545,7 +1734,9 @@ def _page_header(model, page, width):
         hub = "演示"
     if hub.startswith("DEMO"):
         hub = "DEMO"
-    left = join_dot([title, model.get("freshness") or ""])
+    alert = header_alert(model)
+    left = join_dot([title, alert]) if alert else title
+    left = left + " " + t("header_run", model.get("human") or 0, model.get("background") or 0)
     right = join_dot([model.get("link") or "", short_host(hub)])
     return pad_lr(left, right, width)
 
@@ -1597,78 +1788,211 @@ def term_height(default=0):
     return default
 
 
-def _tasks_body(model, width, offset, budget):
-    lines = [
-        clip(
-            t(
-                "counts",
-                model.get("waiting") or 0,
-                model.get("human") or 0,
-                model.get("background") or 0,
-            ),
-            width,
-        )
-    ]
-    age = _age_text(model)
-    if age:
-        lines.append(leader_lr(t("row_collect"), age, width))
-    for host in model.get("hosts") or []:
-        mark = t("st_old") if host.get("stale") else _host_status_label(host.get("status"))
-        name = short_host(ascii_en_text(host.get("label") or host.get("id") or "") or "?")
-        lines.append(leader_lr(name, join_dot([host.get("age_short") or "", mark]), width))
-    lines.append(rule_line(width))
-    items = model.get("tasks") or []
+def page_window(items, offset, per_page):
+    items = list(items or [])
     if not items:
-        lines.append(t("no_tasks"))
-        return lines
-    start = offset % len(items)
-    ordered = items[start:] + items[:start]
-    hidden = model.get("hidden_tasks") or 0
-    if budget:
-        allow = max(1, budget - len(lines) - 1)
-        if len(ordered) > allow:
-            hidden += len(ordered) - allow
-            ordered = ordered[:allow]
-    st_w = 4 if _UI_LANG == "en" else 2
-    proj_w = min(10, max(0, width - 22))
-    for item in ordered:
+        return [], 0, 1
+    if per_page <= 0 or len(items) <= per_page:
+        return items, 0, 1
+    n_pages = (len(items) + per_page - 1) // per_page
+    page_i = int(offset or 0) % n_pages
+    start = page_i * per_page
+    return items[start:start + per_page], page_i, n_pages
+
+
+def task_card_lines(item, width, waiting=False, done=False):
+    if done or waiting:
+        st_w = 4 if _UI_LANG == "en" else 3
+    else:
+        st_w = 4 if _UI_LANG == "en" else 2
+    if done:
+        mark = " "
+        st = clip(t("ask_done"), st_w).ljust(st_w)
+    elif waiting:
+        mark = _art("mark")
+        st = clip(t("ask_open") if item.get("open", True) else task_st(item), st_w).ljust(st_w)
+    else:
         mark = _art("mark") if item.get("waiting_you") else " "
         st = clip(task_st(item), st_w).ljust(st_w)
-        title = ascii_en_text(item.get("title") or "", "?")
-        proj = clip(ascii_en_text(item.get("project") or item.get("tool") or ""), proj_w)
-        room = width - st_w - 3 - (len(proj) + 1 if proj else 0)
-        left = "{0} {1} {2}".format(mark, st, clip(title, max(1, room)))
-        gap = width - len(left) - len(proj)
-        # 手工拼行：pad_lr 里的 clip 会把 mark 列的前导空格 strip 掉。
-        lines.append(left + (" " * max(1, gap)) + proj if proj else left)
-    if hidden:
-        lines.append(clip(t("more_n_tasks", hidden) + " · j/k", width))
+    prefix = "{0}{1} ".format(mark, st)
+    indent = " " * len(prefix)
+    title = ascii_en_text(item.get("title") or "", "?")
+    proj = clip(ascii_en_text(item.get("project") or ""), 8)
+    tail = ("· " + proj) if proj else ""
+    one = width - len(prefix) - (len(tail) + 1 if tail else 0)
+    if one >= 4 and len(title) <= one:
+        left = prefix + title
+        if tail:
+            return [left + (" " * max(1, width - len(left) - len(tail))) + tail]
+        return [left]
+    first_room = max(1, width - len(prefix))
+    line1 = (prefix + title[:first_room])[:width]
+    rest = title[first_room:]
+    second_room = width - len(indent) - (len(tail) + 1 if tail else 0)
+    line2 = indent + rest[: max(0, second_room)]
+    if tail:
+        line2 = line2 + (" " * max(1, width - len(line2) - len(tail))) + tail
+    return [line1[:width], line2[:width]]
+
+
+def _char_kind(ch):
+    if ch == " ":
+        return "sp"
+    if ch in "-_/·:.,;":
+        return "br"
+    o = ord(ch)
+    if (0x2E80 <= o <= 0x9FFF) or (0xF900 <= o <= 0xFAFF) or (0x3400 <= o <= 0x4DBF):
+        return "cjk"
+    if ("0" <= ch <= "9") or ("A" <= ch <= "Z") or ("a" <= ch <= "z"):
+        return "alnum"
+    return "other"
+
+
+def _clip_title_rest(rest, room):
+    """截断到 room 格：优先用不小于半宽的空格/连字符/中英边界，否则硬切。"""
+    if len(rest) <= room:
+        return rest
+    keep = max(1, room - 1)
+    window = rest[:keep]
+    threshold = max(4, keep // 2)
+    cut = 0
+    for i, ch in enumerate(window):
+        kind = _char_kind(ch)
+        if ch == " ":
+            cand = i
+        elif kind in ("br", "cjk"):
+            cand = i + 1
+        elif i + 1 < len(window) and kind == "alnum" and _char_kind(window[i + 1]) == "cjk":
+            cand = i + 1
+        else:
+            continue
+        if cand >= threshold:
+            cut = cand
+    if not cut:
+        cut = keep
+    piece = rest[:cut].rstrip(" -_/·:.,;…")
+    if not piece:
+        piece = rest[:keep]
+    return piece + "…"
+
+
+def short_token(raw, table, max_w):
+    text = ascii_en_text(raw or "", "")
+    text = (text or "").strip()
+    if max_w <= 0:
+        return ""
+    if not text:
+        return ""
+    token = _lookup_abbr(text, table)
+    if token is None:
+        compact = text.replace(" ", "").replace("·", "").replace("-", "").replace("_", "")
+        token = compact[:max_w]
+    return token[:max_w]
+
+
+def task_meta_suffix(item, title=""):
+    proj = short_token(item.get("project") or "", _PROJ_ABBR, TASK_PROJ_W)
+    agent = short_token(item.get("tool") or "", _TOOL_ABBR, TASK_AGENT_W)
+    low = (title or "").strip().lower()
+    if low:
+        if proj and (proj.lower() == low or (_lookup_abbr(low, _PROJ_ABBR) or "").lower() == proj.lower()):
+            proj = ""
+        if agent and agent.lower() == low:
+            agent = ""
+    bits = []
+    if proj:
+        bits.append(proj)
+    if agent:
+        bits.append(agent)
+    return _art("dot").join(bits)
+
+
+def task_row_lines(item, width, mark_gutter=True):
+    """单行任务：槽位标记 + 标题（词界截断），项目·Agent 右对齐。"""
+    title = clean_task_title(item)
+    suffix = task_meta_suffix(item, title)
+    prefix = (_art("mark") if item.get("waiting_you") else " ") + " "
+    if not mark_gutter:
+        prefix = ""
+    room = width - len(prefix) - (len(suffix) + 1 if suffix else 0)
+    room = max(1, room)
+    cell = title if len(title) <= room else _clip_title_rest(title, room)
+    line = prefix + cell
+    if suffix:
+        line += " " * max(1, width - len(line) - len(suffix)) + suffix
+    return [line[:width]]
+
+
+def _pack_line_pages(blocks, usable):
+    pages = []
+    cur = []
+    height = 0
+    for block in blocks:
+        h = len(block)
+        if cur and usable and height + h > usable:
+            pages.append(cur)
+            cur = []
+            height = 0
+        cur.extend(block)
+        height += h
+    if cur or not pages:
+        pages.append(cur)
+    return pages
+
+
+def _tasks_body(model, width, offset, budget, task_filter=None):
+    if task_filter is None:
+        task_filter = TASK_FILTER_DEFAULT
+    items = filter_tasks(model.get("tasks") or [], task_filter)
+    if not items:
+        return [clip(t("no_filter_tasks"), width)]
+    need_mark = any(item.get("waiting_you") for item in items)
+    blocks = [task_row_lines(item, width, mark_gutter=need_mark) for item in items]
+    usable = max(1, budget - 1) if budget else 0
+    pages = _pack_line_pages(blocks, usable)
+    n_pages = max(1, len(pages))
+    page_i = int(offset or 0) % n_pages
+    lines = list(pages[page_i])
+    lines.append(task_nav_line(page_i, n_pages, task_filter, width))
     return lines
 
 
-def _ask_body(model, width, offset):
+def _ask_body(model, width, offset, budget=0):
     items = model.get("attention") or []
     lines = []
     if not items:
         lines += ["", t("no_ask")]
-    else:
+        lines.append("")
+        lines.append(clip(t("no_chat"), width))
+        return lines
+    opened = [item for item in items if item.get("open", True)]
+    closed = [item for item in items if not item.get("open", True)]
+    ordered = opened + closed
+    extra = 3
+    if any(item.get("computer_hint") for item in opened):
+        extra += 1
+    if any(item.get("demo") for item in opened):
+        extra += 1
+    per_page = len(ordered)
+    if budget:
+        per_page = max(1, max(1, budget - extra) // 2)
+    shown, page_i, n_pages = page_window(ordered, offset, per_page)
+    show_open = [item for item in shown if item.get("open", True)]
+    show_done = [item for item in shown if not item.get("open", True)]
+    if show_open:
         banner = _art("fill") * width
         lines.append(banner)
-        start = offset % len(items)
-        ordered = items[start:] + items[:start]
-        proj_w = min(10, max(0, width - 22))
-        for item in ordered:
-            tool = clip(ascii_en_text(item.get("tool") or "") or "?", 7)
-            title = ascii_en_text(item.get("title") or "", "?")
-            proj = clip(ascii_en_text(item.get("project") or ""), proj_w)
-            lines.append(
-                pad_lr("{0} {1} {2}".format(_art("mark"), tool, title), proj, width)
-            )
+        for item in show_open:
+            lines.extend(task_card_lines(item, width, waiting=True))
         lines.append(banner)
-        if any(item.get("computer_hint") for item in ordered):
-            lines.append(clip(t("on_computer"), width))
-        if any(item.get("demo") for item in ordered):
-            lines.append(clip(t("demo_ask"), width))
+    for item in show_done:
+        lines.extend(task_card_lines(item, width, done=True))
+    if n_pages > 1:
+        lines.append(clip(t("page_hint", page_i + 1, n_pages), width))
+    if any(item.get("computer_hint") for item in show_open):
+        lines.append(clip(t("on_computer"), width))
+    if any(item.get("demo") for item in show_open):
+        lines.append(clip(t("demo_ask"), width))
     lines.append("")
     lines.append(clip(t("no_chat"), width))
     return lines
@@ -1682,10 +2006,122 @@ def is_refresh_key(key):
     return key in ("t", "T", None)
 
 
+def task_filter_for_key(key):
+    return _TASK_FILTER_KEYS.get(key)
+
+
+def task_matches_filter(item, kind):
+    if kind == "all" or not kind:
+        return True
+    state = str(item.get("state") or "")
+    if kind == "active":
+        return bool(item.get("waiting_you")) or state in ("active", "wait")
+    if kind == "idle":
+        return state == "idle"
+    if kind == "done":
+        return state in ("done", "fail")
+    return True
+
+
+def filter_tasks(items, kind):
+    out = []
+    for item in items or []:
+        if task_matches_filter(item, kind):
+            out.append(item)
+    return out
+
+
+def _lookup_abbr(text, table):
+    if text in table:
+        return table[text]
+    low = text.lower()
+    for key, val in table.items():
+        if key.lower() == low:
+            return val
+    best = None
+    for key, val in table.items():
+        kl = key.lower()
+        if len(kl) < 3:
+            continue
+        if low.startswith(kl):
+            if best is None or len(kl) > len(best[0]):
+                best = (kl, val)
+    if best:
+        return best[1]
+    return None
+
+
+def abbrev_token(raw, width, table):
+    text = ascii_en_text(raw or "", "")
+    text = (text or "").strip()
+    if width <= 0:
+        return ""
+    if not text:
+        return "-".ljust(width)[:width]
+    token = _lookup_abbr(text, table)
+    if token is None:
+        compact = text.replace(" ", "").replace("·", "").replace("-", "").replace("_", "")
+        token = compact[:width]
+    return token[:width].ljust(width)
+
+
+def clean_task_title(item):
+    title = ascii_en_text(item.get("title") or "", "?")
+    tool = ascii_en_text(item.get("tool") or "")
+    proj = ascii_en_text(item.get("project") or "")
+    for prefix in (
+        "{0} · {1}".format(tool, proj) if tool and proj else "",
+        (tool + " · ") if tool else "",
+        (proj + " · ") if proj else "",
+    ):
+        if prefix and title.startswith(prefix):
+            title = title[len(prefix):].strip(" ·")
+            break
+    for name in (proj, tool):
+        if name and title.lower().startswith(name.lower()):
+            rest = title[len(name):]
+            if rest and rest[0].isalnum() and ord(rest[0]) < 128:
+                continue
+            rest = rest.strip(" ·:-—-")
+            if rest:
+                title = rest
+                break
+    # 首词与项目/工具的缩写同源（如 Contexpect≡ContextView→Ctx）也剥掉。
+    parts = title.split(" ", 1)
+    if len(parts) == 2 and parts[1].strip(" ·:-—-"):
+        for raw, table in ((proj, _PROJ_ABBR), (tool, _TOOL_ABBR)):
+            if not raw:
+                continue
+            tok = _lookup_abbr(parts[0], table)
+            want = _lookup_abbr(raw, table) or raw
+            if tok and want and tok.lower() == want.lower():
+                title = parts[1].strip(" ·:-—-")
+                break
+    return title or proj or tool or "?"
+
+
+def task_filter_bar(kind):
+    parts = []
+    for key, name in (("a", "active"), ("i", "idle"), ("d", "done"), ("u", "all")):
+        label = t("flt_" + name)
+        mark = key.upper() if kind == name else key
+        parts.append(mark + label)
+    return " ".join(parts)
+
+
+def task_nav_line(page_i, n_pages, kind, width):
+    return clip(
+        t("page_hint", page_i + 1, n_pages) + " · " + task_filter_bar(kind),
+        width,
+    )
+
+
 def ask_jump(seen_ids, model):
     """刷新后出现新的待处理 id 才跳页；清空后重置。返回 (是否跳, 新已见集合)。"""
     ids = set()
     for item in model.get("attention") or []:
+        if item.get("open") is False:
+            continue
         iid = str(item.get("id") or "")
         if iid:
             ids.add(iid)
@@ -1705,20 +2141,16 @@ def _quota_body(model, width, offset, budget):
             amount = ascii_en_text(item.get("label") or "") or (item.get("label") or "")
             tool = clip(ascii_en_text(item.get("tool") or "") or "?", 8)
             tail.append(leader_lr(tool, amount, width))
-    tail.append(clip(t("quota_legend"), width))
     if not items:
         lines.append(t("no_quota"))
     else:
         tool_w, win_w, bar_w, pct_w = _quota_geom(width)
         flat = flatten_quota_rows(items)
-        start = offset % len(flat) if flat else 0
-        ordered = flat[start:] + flat[:start]
-        hidden = model.get("hidden_quota") or 0
+        per_page = len(flat)
         if budget:
-            allow = max(1, budget - len(tail) - 1)
-            if len(ordered) > allow:
-                hidden += len(ordered) - allow
-                ordered = ordered[:allow]
+            per_page = max(1, budget - len(tail) - 1)
+        ordered, page_i, n_pages = page_window(flat, offset, per_page)
+        hidden = model.get("hidden_quota") or 0
         prev = None
         for item, win, tool in ordered:
             if tool == prev:
@@ -1736,21 +2168,25 @@ def _quota_body(model, width, offset, budget):
                 pct = clip(quota_pct_cell(item, win), pct_w).rjust(pct_w)
             # 行宽由 _quota_geom 精确拼出，不能再过 clip（clip 会 strip 掉缩进）。
             lines.append("{0} {1} {2} {3}".format(name, win_s, bar_s, pct))
-        if hidden:
+        if n_pages > 1:
+            lines.append(clip(t("page_hint", page_i + 1, n_pages), width))
+        elif hidden:
             lines.append(clip(t("more_n", hidden) + " · j/k", width))
     lines.extend(tail)
     return lines
 
 
-def render_page(model, page, width=36, offset=0, height=0):
+def render_page(model, page, width=36, offset=0, height=0, task_filter=None):
     width = max(28, int(width or 36))
     budget = max(0, int(height) - 5) if height else 0
+    if task_filter is None:
+        task_filter = TASK_FILTER_DEFAULT
     if page == "quota":
         body = _quota_body(model, width, offset, budget)
     elif page == "tasks":
-        body = _tasks_body(model, width, offset, budget)
+        body = _tasks_body(model, width, offset, budget, task_filter)
     elif page == "ask":
-        body = _ask_body(model, width, offset)
+        body = _ask_body(model, width, offset, budget)
     else:
         body = []
     if budget and len(body) > budget:
@@ -1875,6 +2311,7 @@ def main(argv=None):
     height = term_height()
     page = args.page
     offset = 0
+    task_filter = TASK_FILTER_DEFAULT
     last = None
     interactive = (not args.once) and (args.watch or (sys.stdin.isatty() and sys.stdout.isatty()))
     if not args.once and not args.watch and not interactive:
@@ -1890,6 +2327,7 @@ def main(argv=None):
                 source=url or args.file or "demo",
                 lang=args.lang,
             )
+            remember_attention(model)
             return model, None
         except Exception as exc:
             return None, exc
@@ -1901,9 +2339,9 @@ def main(argv=None):
         if args.once:
             if args.all:
                 for name in PAGES:
-                    write_out(render_page(model, name, width=width, height=height))
+                    write_out(render_page(model, name, width=width, height=height, task_filter=task_filter))
             else:
-                write_out(render_page(model, page, width=width, height=height))
+                write_out(render_page(model, page, width=width, height=height, task_filter=task_filter))
             return 2
     else:
         last = model
@@ -1911,7 +2349,7 @@ def main(argv=None):
     if args.once:
         pages = PAGES if args.all else (page,)
         for name in pages:
-            write_out(render_page(model, name, width=width, offset=offset, height=height))
+            write_out(render_page(model, name, width=width, offset=offset, height=height, task_filter=task_filter))
         return 0 if model.get("schema_ok") else 2
 
     # 启动时已有待处理：直接落在待处理页。
@@ -1925,7 +2363,7 @@ def main(argv=None):
         shown = last or model
         if sys.stdout.isatty():
             clear_screen()
-        write_out(render_page(shown, page, width=width, offset=offset, height=height))
+        write_out(render_page(shown, page, width=width, offset=offset, height=height, task_filter=task_filter))
         sys.stdout.flush()
         key = None
         wait = interval
@@ -1941,6 +2379,11 @@ def main(argv=None):
         nxt_page = page_for_key(key)
         if nxt_page:
             page, offset = nxt_page, 0
+            continue
+        nxt_filter = task_filter_for_key(key)
+        if nxt_filter and page == "tasks":
+            task_filter = nxt_filter
+            offset = 0
             continue
         if key in ("j", "J", "n"):
             offset += 1

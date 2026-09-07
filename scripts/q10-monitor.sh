@@ -106,7 +106,7 @@ print("LAN_PORT", pref)
 print("LAN_HAS_8790", any(":8790" in ln and ln.startswith("Q10_LAN_HUB_URL=") for ln in out))
 PY
   MONO="${ROOT}/local-config/q10-cjk-mono.ttf"
-  if [[ ! -f "${MONO}" ]]; then
+  if [[ ! -f "${MONO}" || "${ROOT}/scripts/q10-build-cjk-mono.py" -nt "${MONO}" ]]; then
     python3 -m pip install --target /tmp/q10-fonttools fonttools -q
     SRC_HEI="/tmp/q10-fonts/mhei.ttf"
     mkdir -p /tmp/q10-fonts
