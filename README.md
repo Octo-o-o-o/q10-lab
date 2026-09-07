@@ -40,5 +40,4 @@
 
 ## 状态
 
-**Phase 1 完成**（用户 2026-09-07 判定）。Golden baseline 见 [GOLDEN_BASELINE.md](docs/GOLDEN_BASELINE.md)，tag `q10-clean-baseline`。  
-Security Wipe 现为输入 `blackberry`（BBID 强制绑定已清）。三方应用已用 deploy 卸掉。Term49 / BerryCore **尚未**装。密码不进 Git。
+**Phase 1 完成**（tag `q10-clean-baseline`）。Term49 0.4.1.7 已装并 launch。BerryCore 未装。密码不进 Git。

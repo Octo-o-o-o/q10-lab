@@ -52,3 +52,12 @@ Host 是 **Mac**。未改手机系统、未刷机、未 wipe、未装 Term49 / B
 - YouTube 无独立应用，系统 Hub 连接器未动。
 - Golden baseline：`docs/GOLDEN_BASELINE.md` + tag `q10-clean-baseline`。
 - 下一阶段：先 Term49，再评估 BerryCore。不改圆屏仓库。
+
+### 2026-09-07 Term49（Phase 2 第一步）
+
+- 已下并校验 `downloads/Term49.bar`（不进 Git）。
+- `blackberry-deploy -installApp` → `result::success`，版本 1.0.0.1。
+- `listInstalledApps` 有 `com.example.Term49…`。
+- `-launchApp` 回报 `Info: done`。请在手机主屏确认图标和终端能开。
+- SSH 可见 `/accounts/1000/appdata/com.example.Term49…`。`/apps` 对 `devuser` 无权限。
+- BerryCore **仍未装**。
