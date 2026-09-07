@@ -59,5 +59,6 @@ ssh -F /dev/null -o KexAlgorithms=diffie-hellman-group14-sha1 \
 - 访问设备 IP 必须绕过本机 HTTP 代理（`NO_PROXY=*`）。否则 HTTPS 会先 `200 Connection established` 再打歪。
 - 设备 HTTPS 是 **TLSv1 + 自签名证书**。Java 17 默认禁用 TLS 1.0 时，`BarDeploy.jar` 报 `peer not authenticated`。包装脚本用 `tools/bb10/java.security.override` 只为这套工具打开 TLSv1。
 - 不要假设下一根线、下一次插拔仍是同一个 169.254 地址。以 `./scripts/q10-detect.sh` 为准。
-- 8790 是 **Mac 上的 Aindle hub**，不是手机端口。Q10 经 USB 网卡 GET `http://<Mac-USB-IP>:8790/snapshot.json`。Hub 须听在 `*` 或 USB 地址；只听 `127.0.0.1` 时手机摸不到。
+- Hub 是 **Mac 上的 Aindle**，不是手机端口。合同端口是 `AINDLE_PORT`（默认 **8787**）。Q10 经 USB GET `http://<Mac-USB-IP>:<port>/snapshot.json`。Hub 须听在 `*` 或 USB 地址；只听 `127.0.0.1` 时手机摸不到。
+- 端口变了不要另起一份 Hub。客户端按 last-good → 当前 USB/LAN → 短名单（`Q10_HUB_PORTS`，默认 8787 再 8790）→ 信箱探测；本机脚本同一套。进程挂了只 `launchctl kickstart gui/$UID/com.aindle.hub`，禁止在本仓库监听 8790。
 - `ps` 里 Java 命令行会露出 `-password`。这是官方工具限制，不要把那段输出贴进仓库。

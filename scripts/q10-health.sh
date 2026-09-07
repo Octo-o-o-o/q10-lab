@@ -35,9 +35,26 @@ else
   echo "Monitor         unknown"
 fi
 
-HUB="${Q10_MONITOR_URL:-http://169.254.0.2:8790/snapshot.json}"
-if curl --noproxy '*' -sS -m 3 -o /dev/null -w '' "${HUB}"; then
-  echo "Hub 8790        OK  ${HUB}"
+if HUB="$(q10_ensure_hub)"; then
+  echo "Hub             OK  ${HUB}"
 else
-  echo "Hub 8790        FAIL  ${HUB}"
+  echo "Hub             FAIL  试过 $(q10_hub_ports_csv) @ 169.254.0.2/127.0.0.1；不要在本仓库另起 Hub"
+fi
+
+MAILBOX_URL="${Q10_MAILBOX_URL:-}"
+if [[ -z "${MAILBOX_URL}" && -f "${ROOT}/local-config/mailbox.url" ]]; then
+  MAILBOX_URL="$(tr -d '[:space:]' < "${ROOT}/local-config/mailbox.url")"
+fi
+TOKEN_FILE="${Q10_MAILBOX_TOKEN_FILE:-${ROOT}/local-config/mailbox.token}"
+if [[ -n "${MAILBOX_URL}" && -f "${TOKEN_FILE}" ]]; then
+  token="$(tr -d '[:space:]' < "${TOKEN_FILE}")"
+  if curl --noproxy '*' -sS -m 8 -f -o /tmp/q10-mailbox-health.json \
+    -H "Authorization: Bearer ${token}" "${MAILBOX_URL}"; then
+    echo "Mailbox         OK"
+  else
+    echo "Mailbox         FAIL"
+  fi
+  unset token
+else
+  echo "Mailbox         not configured"
 fi

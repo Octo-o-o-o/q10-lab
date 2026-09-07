@@ -62,7 +62,7 @@ Host 是 **Mac**。未改手机系统、未刷机、未 wipe、未装 Term49 / B
 - SSH 可见 `/accounts/1000/appdata/com.example.Term49…`。`/apps` 对 `devuser` 无权限。
 - BerryCore **仍未装**。
 
-### 2026-09-07 Term49 本机验收 + 8790 对应
+### 2026-09-07 Term49 本机验收 + Hub 对应（当时 8790，现 8787）
 
 用户确认：Term49 能打字；左上角元模式绿 M；`k/j/h/l` 方向；`c` 再 `c` = Ctrl-C。
 
@@ -103,3 +103,14 @@ Mac 侧对应：
 - 出厂 `1`/`W` = 语音信箱。空键用 **`Z` → App Launch → Term49**。
 - SSH 不能写 Term49 `$HOME`。自动进监视器要在 Term49 里跑一次 `q10-autostart.sh`。
 - Mac：`./scripts/q10-launch.sh` 可 `-launchApp` Term49。
+
+### 2026-09-07 监视器改回中文
+
+- Term49 默认 Andale Mono 没有汉字，方框是缺字形。
+- `q10mon` 在 Term49 里把 `.term49rc` 的 `font_path` 写成 `MHeiM.GB18030_200910.ttf`。
+- 默认 `--lang zh`。任务标题本身也可能是中文。
+- 第一次写字体后必须完全划掉 Term49 再开一次。
+
+### 2026-09-07 Hub 端口 8790 → 8787
+
+Aindle Hub 现听 `*:8787`。旧 8790 无人听，监视器会整页「不可用」（各页共用同一份失败快照，不是切换坏了）。Q10 默认改读 8787。不要再起抢端口的 8790 Hub；圆屏 collector 仍写死 8790，不改圆屏仓库。

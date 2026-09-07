@@ -3,10 +3,35 @@
 """Adapter rules aligned with the ESP32 round-screen host/adapter.py."""
 import json
 import os
+import tempfile
 import unittest
 from datetime import datetime
 
-from q10_monitor import adapt, mark_offline, overlay_source_times, used_pct
+from q10_monitor import (
+    SNAPSHOT_SCHEMA,
+    _mailbox_token,
+    adapt,
+    ask_jump,
+    build_parser,
+    expand_http_ports,
+    fetch_first_snapshot,
+    filter_hub_urls,
+    guess_hub_url,
+    hub_link_kind,
+    hub_ports,
+    mark_offline,
+    overlay_source_times,
+    read_last_hub_url,
+    render_page,
+    replace_url_port,
+    resolve_hub_urls,
+    set_ui_lang,
+    used_pct,
+    is_refresh_key,
+    page_for_key,
+    window_key_label,
+    write_last_hub_url,
+)
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 FIXTURES = os.path.join(HERE, "fixtures")
@@ -19,6 +44,34 @@ def _load(name):
 
 
 class AdapterTests(unittest.TestCase):
+    def setUp(self):
+        set_ui_lang("zh")
+        fd, self._last_file = tempfile.mkstemp()
+        os.close(fd)
+        os.remove(self._last_file)
+        self._old_last = os.environ.get("Q10_HUB_LAST_FILE")
+        self._old_ports = os.environ.get("Q10_HUB_PORTS")
+        self._old_aindle = os.environ.get("AINDLE_PORT")
+        os.environ["Q10_HUB_LAST_FILE"] = self._last_file
+        os.environ.pop("Q10_HUB_PORTS", None)
+        os.environ.pop("AINDLE_PORT", None)
+
+    def tearDown(self):
+        if self._old_last is None:
+            os.environ.pop("Q10_HUB_LAST_FILE", None)
+        else:
+            os.environ["Q10_HUB_LAST_FILE"] = self._old_last
+        if self._old_ports is None:
+            os.environ.pop("Q10_HUB_PORTS", None)
+        else:
+            os.environ["Q10_HUB_PORTS"] = self._old_ports
+        if self._old_aindle is None:
+            os.environ.pop("AINDLE_PORT", None)
+        else:
+            os.environ["AINDLE_PORT"] = self._old_aindle
+        if os.path.isfile(self._last_file):
+            os.remove(self._last_file)
+
     def test_pct_is_used_not_remaining(self):
         self.assertEqual(used_pct(64), 64)
         self.assertIsNone(used_pct(None))
@@ -96,10 +149,10 @@ class AdapterTests(unittest.TestCase):
     def test_demo_flag_is_explicit(self):
         live_shaped = adapt(_load("snapshot_demo.json"), now=NOW, demo=False)
         self.assertFalse(live_shaped["demo"])
-        self.assertNotIn("DEMO", live_shaped["source"])
+        self.assertNotIn("演示", live_shaped["source"])
         demo = adapt(_load("snapshot_demo.json"), now=NOW, demo=True)
         self.assertTrue(demo["demo"])
-        self.assertIn("DEMO", demo["source"])
+        self.assertIn("演示", demo["source"])
 
     def test_windows_not_summed(self):
         model = adapt(_load("snapshot_demo.json"), now=NOW, demo=True, quota_limit=10)
@@ -198,6 +251,270 @@ class AdapterTests(unittest.TestCase):
         merged = overlay_source_times(snap, overlay)
         claude = next(s for s in merged["subscriptions"] if s["id"] == "claude-demo")
         self.assertEqual(claude["collectedAt"], "2026-09-05T11:58:00.000Z")
+
+    def test_cli_default_is_chinese(self):
+        self.assertEqual(build_parser().get_default("lang"), "zh")
+        self.assertEqual(build_parser().get_default("page"), "quota")
+
+    def test_q10_letter_keys_match_numbers(self):
+        self.assertEqual(page_for_key("1"), "quota")
+        self.assertEqual(page_for_key("w"), "quota")
+        self.assertEqual(page_for_key("W"), "quota")
+        self.assertEqual(page_for_key("2"), "tasks")
+        self.assertEqual(page_for_key("e"), "tasks")
+        self.assertEqual(page_for_key("3"), "ask")
+        self.assertEqual(page_for_key("r"), "ask")
+        self.assertEqual(page_for_key("4"), "ask")
+        self.assertEqual(page_for_key("s"), "ask")
+        self.assertIsNone(page_for_key("t"))
+        self.assertTrue(is_refresh_key("t"))
+        self.assertTrue(is_refresh_key("T"))
+        self.assertTrue(is_refresh_key(None))
+        self.assertFalse(is_refresh_key("r"))
+
+    def test_chinese_tasks_and_quota_copy(self):
+        model = adapt(_load("snapshot_demo.json"), now=NOW, demo=True, quota_limit=10)
+        tasks = render_page(model, "tasks", width=42)
+        quota = render_page(model, "quota", width=42)
+        self.assertIn("任务", tasks)
+        self.assertIn("等你", tasks)
+        self.assertIn("人手", tasks)
+        self.assertNotIn("ASK/", tasks)
+        self.assertNotIn("+--", tasks)
+        self.assertIn("正常", tasks)
+        self.assertIn("失败", quota)
+        self.assertIn("缺失", quota)
+        self.assertNotIn("| ERR|", quota)
+        self.assertNotIn("+--", quota)
+        self.assertIn("t刷新", tasks)
+        self.assertIn("x关闭", tasks)
+
+    def test_window_keys_ascii_in_english(self):
+        set_ui_lang("en")
+        self.assertEqual(window_key_label("三方"), "3rd")
+        self.assertEqual(window_key_label("自有"), "own")
+        self.assertEqual(window_key_label("本周"), "week")
+        self.assertEqual(window_key_label("月"), "mo")
+        self.assertEqual(window_key_label("5h"), "5h")
+        set_ui_lang("zh")
+        self.assertEqual(window_key_label("三方"), "三方")
+
+    def test_english_quota_table_not_zero_for_errors(self):
+        set_ui_lang("en")
+        model = adapt(_load("snapshot_demo.json"), now=NOW, demo=True, quota_limit=10, lang="en")
+        page = render_page(model, "quota", width=42)
+        self.assertIn("3rd", page)
+        self.assertIn("own", page)
+        self.assertIn("ERR", page)
+        self.assertIn("NONE", page)
+        self.assertIn("DeepSeek", page)
+        self.assertNotIn("+--", page)
+        self.assertNotIn("collect failed", page)
+        gemini = next(i for i in model["quota_items"] if i["tool"] == "Gemini")
+        self.assertEqual(gemini["windows"], [])
+
+    def test_english_status_and_tasks_are_tables(self):
+        model = adapt(_load("snapshot_demo.json"), now=NOW, demo=True, task_limit=10, lang="en")
+        tasks = render_page(model, "tasks", width=42)
+        ask = render_page(model, "ask", width=42)
+        self.assertIn("need", tasks)
+        self.assertIn("Demo Desk", tasks)
+        self.assertIn("YOU", tasks)
+        self.assertIn("OLD", tasks)
+        self.assertNotIn("+--", tasks)
+        self.assertIn("1 QUOTA  2 TASK  3 ASK", tasks)
+
+    def test_mailbox_token_skips_unreadable(self):
+        fd, path = tempfile.mkstemp()
+        os.write(fd, b"secret\n")
+        os.close(fd)
+        os.chmod(path, 0)
+        old_file = os.environ.get("Q10_MAILBOX_TOKEN_FILE")
+        old_tok = os.environ.get("Q10_MAILBOX_TOKEN")
+        os.environ["Q10_MAILBOX_TOKEN_FILE"] = path
+        os.environ.pop("Q10_MAILBOX_TOKEN", None)
+        try:
+            self.assertEqual(_mailbox_token(), "")
+        finally:
+            if old_file is None:
+                os.environ.pop("Q10_MAILBOX_TOKEN_FILE", None)
+            else:
+                os.environ["Q10_MAILBOX_TOKEN_FILE"] = old_file
+            if old_tok is None:
+                os.environ.pop("Q10_MAILBOX_TOKEN", None)
+            else:
+                os.environ["Q10_MAILBOX_TOKEN"] = old_tok
+            os.chmod(path, 0o600)
+            os.remove(path)
+
+    def test_guess_hub_url_forced_beats_mailbox(self):
+        old = {}
+        for key in ("Q10_MONITOR_URL", "Q10_LAN_HUB_URL", "Q10_MAILBOX_URL"):
+            old[key] = os.environ.get(key)
+        os.environ["Q10_MONITOR_URL"] = "http://forced.test/snapshot.json"
+        os.environ["Q10_LAN_HUB_URL"] = "http://lan.test/snapshot.json"
+        os.environ["Q10_MAILBOX_URL"] = "https://mb.test/snapshot.json"
+        try:
+            self.assertEqual(guess_hub_url(), "http://forced.test/snapshot.json")
+        finally:
+            for key, value in old.items():
+                if value is None:
+                    os.environ.pop(key, None)
+                else:
+                    os.environ[key] = value
+
+    def test_filter_hub_urls_skips_lan_off_subnet(self):
+        usb = "http://169.254.0.2:8787/snapshot.json"
+        lan = "http://192.168.31.132:8787/snapshot.json"
+        mailbox = "https://mb.test/snapshot.json"
+        home = filter_hub_urls("", usb, lan, mailbox, ["169.254.0.1", "192.168.31.106"])
+        self.assertEqual(home, [usb, lan, mailbox])
+        away = filter_hub_urls("", "", lan, mailbox, ["10.20.30.40"])
+        self.assertEqual(away, [mailbox])
+        wifi_only = filter_hub_urls("", "", lan, mailbox, ["192.168.31.106"])
+        self.assertEqual(wifi_only, [lan, mailbox])
+
+    def test_fetch_first_snapshot_fails_over(self):
+        good = {"schema": SNAPSHOT_SCHEMA, "hosts": []}
+        calls = []
+
+        def fake(url, timeout):
+            calls.append((url, timeout))
+            if url.endswith("/dead"):
+                raise IOError("down")
+            return good
+
+        snap, url = fetch_first_snapshot(
+            ["http://x/dead", "http://x/ok"], fetch_fn=fake
+        )
+        self.assertEqual(url, "http://x/ok")
+        self.assertEqual(snap["schema"], SNAPSHOT_SCHEMA)
+        self.assertEqual([c[0] for c in calls], ["http://x/dead", "http://x/ok"])
+
+    def test_hub_link_kind(self):
+        set_ui_lang("zh")
+        self.assertEqual(hub_link_kind("http://169.254.0.2:8787/snapshot.json"), "USB")
+        self.assertEqual(hub_link_kind("http://192.168.31.132:8787/snapshot.json"), "局域网")
+        self.assertEqual(hub_link_kind("https://mb.test/snapshot.json"), "信箱")
+
+    def test_hub_ports_keeps_aindle_then_legacy(self):
+        self.assertEqual(hub_ports(""), [8787, 8790])
+        self.assertEqual(hub_ports("9000"), [9000, 8787, 8790])
+        os.environ["AINDLE_PORT"] = "9100"
+        self.assertEqual(hub_ports(), [9100, 8787, 8790])
+
+    def test_expand_http_ports_skips_https(self):
+        url = "https://mb.test/snapshot.json"
+        self.assertEqual(expand_http_ports(url), [url])
+
+    def test_expand_http_ports_adds_sibling(self):
+        url = "http://169.254.0.2:8787/snapshot.json"
+        out = expand_http_ports(url, ports=(8787, 8790))
+        self.assertEqual(out[0], url)
+        self.assertEqual(out[1], "http://169.254.0.2:8790/snapshot.json")
+        self.assertEqual(
+            replace_url_port("http://192.168.1.10:8790/snapshot.json", 8787),
+            "http://192.168.1.10:8787/snapshot.json",
+        )
+
+    def test_resolve_last_dead_port_then_sibling(self):
+        last = "http://169.254.0.2:8790/snapshot.json"
+        usb = "http://169.254.0.2:8787/snapshot.json"
+        out = resolve_hub_urls("", usb, "", "", ["169.254.0.1"], last=last, ports=(8787, 8790))
+        self.assertEqual(out[0], last)
+        self.assertEqual(out[1], usb)
+
+    def test_resolve_skips_mailbox_last_when_usb_present(self):
+        last = "https://mb.test/snapshot.json"
+        usb = "http://169.254.0.2:8787/snapshot.json"
+        mailbox = last
+        out = resolve_hub_urls(
+            "", usb, "", mailbox, ["169.254.0.1"], last=last, ports=(8787,)
+        )
+        self.assertEqual(out[0], usb)
+        self.assertIn(mailbox, out)
+        self.assertGreater(out.index(mailbox), 0)
+
+    def test_last_hub_roundtrip_and_reject_junk(self):
+        self.assertEqual(read_last_hub_url(), "")
+        self.assertTrue(write_last_hub_url("http://169.254.0.2:8787/snapshot.json"))
+        self.assertEqual(read_last_hub_url(), "http://169.254.0.2:8787/snapshot.json")
+        self.assertFalse(write_last_hub_url("not-a-url"))
+        self.assertEqual(read_last_hub_url(), "http://169.254.0.2:8787/snapshot.json")
+
+    def test_fetch_first_snapshot_writes_last(self):
+        good = {"schema": SNAPSHOT_SCHEMA, "hosts": []}
+
+        def fake(url, timeout):
+            if url.endswith("/ok"):
+                return good
+            raise IOError("down")
+
+        snap, url = fetch_first_snapshot(
+            ["http://x/dead", "http://x/ok"], fetch_fn=fake
+        )
+        self.assertEqual(url, "http://x/ok")
+        self.assertEqual(snap["schema"], SNAPSHOT_SCHEMA)
+        self.assertEqual(read_last_hub_url(), "http://x/ok")
+
+    def test_layout_rules_and_width(self):
+        model = adapt(_load("snapshot_demo.json"), now=NOW, demo=True, quota_limit=10)
+        for page in ("quota", "tasks", "ask"):
+            out = render_page(model, page, width=36)
+            lines = out.splitlines()
+            self.assertEqual(lines[0], lines[0][:36])
+            self.assertEqual(lines[1], "─" * 36)
+            self.assertEqual(lines[-2], "─" * 36)
+            for ln in lines:
+                self.assertLessEqual(len(ln), 36)
+        quota = render_page(model, "quota", width=36)
+        self.assertIn("█", quota)
+        tasks = render_page(model, "tasks", width=36)
+        self.assertIn("·", tasks)
+
+    def test_ask_banner_and_footer_badge(self):
+        model = adapt(_load("snapshot_demo.json"), now=NOW, demo=True)
+        ask = render_page(model, "ask", width=36)
+        self.assertIn("█" * 36, ask)
+        self.assertIn("待处理(", ask)
+        self.assertIn("●", ask)
+        stale = adapt(_load("snapshot_stale.json"), now=NOW)
+        calm = render_page(stale, "ask", width=36)
+        self.assertNotIn("█" * 36, calm)
+        self.assertIn("没有待处理", calm)
+
+    def test_ask_jump_only_on_new_items(self):
+        model = adapt(_load("snapshot_demo.json"), now=NOW, demo=True)
+        jump, seen = ask_jump(set(), model)
+        self.assertTrue(jump)
+        jump2, seen2 = ask_jump(seen, model)
+        self.assertFalse(jump2)
+        self.assertEqual(seen, seen2)
+        empty = adapt(_load("snapshot_stale.json"), now=NOW)
+        jump3, seen3 = ask_jump(seen2, empty)
+        self.assertFalse(jump3)
+        self.assertEqual(seen3, set())
+        model2 = dict(model)
+        model2["attention"] = list(model["attention"]) + [{"id": "new-1", "title": "x"}]
+        jump4, _seen4 = ask_jump(seen, model2)
+        self.assertTrue(jump4)
+
+    def test_height_trims_rows_with_hint(self):
+        model = adapt(_load("snapshot_demo.json"), now=NOW, demo=True)
+        out = render_page(model, "quota", width=36, height=12)
+        self.assertIn("另有", out)
+        self.assertLessEqual(len(out.splitlines()), 12)
+        full = render_page(model, "quota", width=36)
+        self.assertGreater(len(full.splitlines()), 12)
+
+    def test_english_layout_is_ascii(self):
+        set_ui_lang("en")
+        model = adapt(_load("snapshot_demo.json"), now=NOW, demo=True, lang="en")
+        out = render_page(model, "quota", width=42)
+        lines = out.splitlines()
+        self.assertEqual(lines[1], "-" * 42)
+        self.assertIn("#", out)
+        set_ui_lang("zh")
 
 
 if __name__ == "__main__":

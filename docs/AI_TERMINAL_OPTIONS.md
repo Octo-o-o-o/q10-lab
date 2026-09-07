@@ -4,7 +4,7 @@
 
 | 路线 | 决定 | 原因 |
 |---|---|---|
-| Term49 + `python3.2` TUI | **采用** | 已装、键盘可用、能 GET 8790 |
+| Term49 + `python3.2` TUI | **采用** | 已装、键盘可用、能 GET 8787 |
 | USB SSH `./scripts/q10-monitor.sh` | **采用** | 与 Term49 同一份脚本，Mac 可取证 |
 | 自签 Cascades 监视器 BAR | 不做 | 无 debug token；生产签名一套未建 |
 | Berry Browser Chromium BAR | **禁止** | 作者写明要 root |

@@ -36,7 +36,7 @@ Term49（个人用户，`.profile` 写不到它的 HOME）打一行：
 ## 已核验
 
 - 98 个 zip 包装完；`qpkg` / `curl` 8.12.1 / `git` / `vim` 在 PATH
-- `curl http://169.254.0.2:8790/snapshot.json` → `aindle.snapshot.v2`
+- `curl http://169.254.0.2:8787/snapshot.json` → `aindle.snapshot.v2`
 - `/` 用到约 **3.8G / 30%**（装前约 2.8G）
 
 ## 已知缺口

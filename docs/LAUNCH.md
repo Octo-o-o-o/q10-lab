@@ -26,6 +26,10 @@ SSH `devuser` **写不进** Term49 沙箱 `$HOME`，所以我不能在你不打�
 
 之后再按 `Z`：Term49 开 → 监视器。`x` 退回 shell。`Q10_NOMON=1` 可跳过。
 
+监视器默认中文。Term49 出厂字体没有汉字。Mac 上 `./scripts/q10-term49-cjk.sh --restart` 会改沙箱 `.term49rc` 并重开 Term49。手机里按 `x` **只退出监视器，字体不会变**。必须从多任务里划掉 Term49 再打开。
+
+`q10-mailbox.token` 必须是 640。写成 600 时 Term49 会 Permission denied，整页失败。
+
 ## Mac 上能替你按的
 
 ```sh
@@ -39,12 +43,15 @@ SSH `devuser` **写不进** Term49 沙箱 `$HOME`，所以我不能在你不打�
 
 | 项 | 手机监视器 | Mac SSH 监视器 |
 |---|---|---|
-| USB + Developer Mode | 要（猜 Mac `169.254.*.2:8790`） | 要 |
-| Mac 8790 听在 `*` 或 USB 地址 | 要 | 要 |
+| USB + Developer Mode | 要（猜 Mac `169.254.*.2`，端口探测 8787/8790） | 要 |
+| Mac Hub 听在 `*` 或 USB 地址 | 要（默认 8787） | 要 |
 | `blackberry-connect` / SSH | 不要 | 要 |
 | 主屏 `Z` → Term49 | 要（一次设置） | 不要 |
 
-8790 只听 `127.0.0.1` 时手机是摸不到的。本机刚才是 `*:8790`。
+8787 只听 `127.0.0.1` 时手机是摸不到的。本机刚才是 `*:8787`。
+
+人在旁边：`Z` → Term49 → `1/W` 限额、`2/E` 任务、`3/R` 待处理（`4/S` 同待处理），`t` 刷新。同屋无线：Q10 连家宽，监视器指向 `http://<Mac局域网IP>:8787/snapshot.json`。  
+手机走流量、Mac 在家：不能直连。用信箱，见 [MAILBOX.md](MAILBOX.md)。USB 仍优先于信箱。
 
 ## 做不到 / 故意不做
 

@@ -7,15 +7,16 @@ source "${ROOT}/scripts/q10-common.sh"
 q10_load_local_env
 
 TERM49_FULL="${Q10_TERM49_FULLNAME:-com.example.Term49.gYABgFEqMSpja5S6kL.DWpWmq50}"
-HUB="${Q10_MONITOR_URL:-http://169.254.0.2:8790/snapshot.json}"
+HUB="$(q10_ensure_hub || true)"
+HUB="${HUB:-${Q10_MONITOR_URL:-http://169.254.0.2:8787/snapshot.json}}"
 
 if ! BB_BIN="$(q10_find_bb_tools)" || [[ ! -x "${BB_BIN}/blackberry-deploy" ]]; then
-  echo "blackberry-deploy not available."
+  echo "没有 blackberry-deploy。"
   exit 2
 fi
 DEVICE_IP="$(q10_device_ip || true)"
 if [[ -z "${DEVICE_IP}" ]]; then
-  echo "DEVICE_IP not found. Plug the Q10 in and run ./scripts/q10-detect.sh"
+  echo "找不到 DEVICE_IP。请插上 Q10 并跑 ./scripts/q10-detect.sh"
   exit 1
 fi
 q10_prompt_password || exit 1
@@ -23,7 +24,7 @@ q10_prompt_password || exit 1
 hub_code="$(curl --noproxy '*' -sS -m 3 -o /dev/null -w '%{http_code}' "${HUB}" || echo 000)"
 echo "HUB ${HUB}  http=${hub_code}"
 if [[ "${hub_code}" != "200" ]]; then
-  echo "WARN: 8790 not reachable on USB. Term49 can open, but the monitor will show 不可用/离线."
+  echo "警告：USB/本机摸不到 Hub（$(q10_hub_ports_csv)）。Term49 能打开，但监视器会先探测再标离线。"
 fi
 
 set +e

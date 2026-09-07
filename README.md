@@ -25,7 +25,8 @@
 ./scripts/q10-shell.sh            # USB SSH
 ./scripts/q10-send.sh             # 把脚本推到 /var/tmp，可选 --run
 ./scripts/q10-monitor.sh          # 键盘 AI Monitor（真机 --once）
-./scripts/q10-monitor.sh --local  # Mac 预览同一份 8790
+./scripts/q10-monitor.sh --local  # Mac 预览同一份 8787
+./scripts/q10-mailbox-push.sh --loop  # 异地：把 8787 推到信箱
 ./scripts/q10-launch.sh           # 把 Term49 拉到前台
 ```
 
@@ -43,7 +44,8 @@
 | `checksums/` | 期望哈希 |
 | `logs/` | 探测与安装日志，不提交 |
 | `tools/bb10/` | 解压后的 host tools，不提交 |
-| `ai-terminal/` | 键盘 AI Monitor（python3.2 TUI，读 8790） |
+| `ai-terminal/` | 键盘 AI Monitor（python3.2 TUI，读 8787） |
+| `mailbox/` | 异地只读快照 Worker（HTTPS + token） |
 
 ## 状态
 

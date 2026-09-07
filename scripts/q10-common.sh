@@ -223,3 +223,121 @@ q10_prompt_password() {
   printf '\n' >&2
   export Q10_DEVICE_PASSWORD
 }
+
+# Aindle 默认 8787；8790 只作回退。不要在本仓库另起 Hub。
+q10_hub_ports() {
+  local raw="${Q10_HUB_PORTS:-}"
+  if [[ -z "${raw}" && -n "${AINDLE_PORT:-}" ]]; then
+    raw="${AINDLE_PORT}"
+  fi
+  raw="${raw//,/ }"
+  local out="" p
+  for p in ${raw} 8787 8790; do
+    case "${p}" in
+      ''|*[!0-9]*) continue ;;
+    esac
+    case " ${out} " in
+      *" ${p} "*) ;;
+      *) out="${out} ${p}" ;;
+    esac
+  done
+  # shellcheck disable=SC2086
+  printf '%s\n' ${out}
+}
+
+q10_hub_ports_csv() {
+  q10_hub_ports | paste -sd, -
+}
+
+q10_hub_last_file() {
+  printf '%s\n' "${Q10_LAB_ROOT}/local-config/q10-hub.last"
+}
+
+q10_probe_snapshot() {
+  local url="$1"
+  local tmp
+  tmp="$(mktemp)"
+  if ! curl --noproxy '*' -sS -m 2 -f -o "${tmp}" "${url}" >/dev/null 2>&1; then
+    rm -f "${tmp}"
+    return 1
+  fi
+  if python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); raise SystemExit(0 if d.get("schema")=="aindle.snapshot.v2" else 1)' "${tmp}"; then
+    rm -f "${tmp}"
+    return 0
+  fi
+  rm -f "${tmp}"
+  return 1
+}
+
+q10_remember_hub_url() {
+  local url="$1"
+  local dest
+  dest="$(q10_hub_last_file)"
+  mkdir -p "$(dirname "${dest}")"
+  printf '%s\n' "${url}" > "${dest}"
+}
+
+q10_hub_candidate_urls() {
+  local lastf url host port last=""
+  lastf="$(q10_hub_last_file)"
+  if [[ -n "${Q10_MONITOR_URL:-}" ]]; then
+    printf '%s\n' "${Q10_MONITOR_URL}"
+  fi
+  if [[ -f "${lastf}" ]]; then
+    last="$(tr -d '[:space:]' < "${lastf}")"
+    if [[ -n "${last}" ]]; then
+      printf '%s\n' "${last}"
+    fi
+  fi
+  if [[ -n "${Q10_HUB_URL:-}" ]]; then
+    printf '%s\n' "${Q10_HUB_URL}"
+  fi
+  if [[ -f "${Q10_LAB_ROOT}/local-config/mailbox.lan" ]]; then
+    printf '%s\n' "$(tr -d '[:space:]' < "${Q10_LAB_ROOT}/local-config/mailbox.lan")"
+  fi
+  while read -r port; do
+    for host in 169.254.0.2 127.0.0.1; do
+      printf 'http://%s:%s/snapshot.json\n' "${host}" "${port}"
+    done
+  done <<EOF
+$(q10_hub_ports)
+EOF
+}
+
+q10_resolve_hub_url() {
+  local url seen=""
+  while read -r url; do
+    [[ -z "${url}" ]] && continue
+    case " ${seen} " in
+      *" ${url} "*) continue ;;
+    esac
+    seen="${seen} ${url}"
+    if q10_probe_snapshot "${url}"; then
+      q10_remember_hub_url "${url}"
+      printf '%s\n' "${url}"
+      return 0
+    fi
+  done <<EOF
+$(q10_hub_candidate_urls)
+EOF
+  return 1
+}
+
+q10_ensure_hub() {
+  local url
+  if url="$(q10_resolve_hub_url)"; then
+    printf '%s\n' "${url}"
+    return 0
+  fi
+  local label="gui/$(id -u)/com.aindle.hub"
+  if launchctl print "${label}" >/dev/null 2>&1; then
+    echo "Hub 全端口未响应，kickstart ${label}" >&2
+    launchctl kickstart -k "${label}" || true
+    sleep 2
+    if url="$(q10_resolve_hub_url)"; then
+      printf '%s\n' "${url}"
+      return 0
+    fi
+  fi
+  return 1
+}

@@ -6,7 +6,11 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 source "${ROOT}/scripts/q10-common.sh"
 q10_load_local_env
 
-HUB="${Q10_MONITOR_URL:-http://169.254.0.2:8790/snapshot.json}"
+HUB="$(q10_resolve_hub_url || true)"
+if [[ -z "${HUB}" ]]; then
+  echo "Hub 未响应 $(q10_hub_ports_csv)。不要在本仓库另起 Hub。"
+  exit 1
+fi
 "${ROOT}/scripts/q10-shell.sh" "python3.2 -c '
 import json, sys, urllib.request
 url = sys.argv[1]

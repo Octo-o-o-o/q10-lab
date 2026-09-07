@@ -18,31 +18,251 @@ import time
 from datetime import datetime
 
 SNAPSHOT_SCHEMA = "aindle.snapshot.v2"
+# Aindle 合同：AINDLE_PORT 默认 8787。8790 只作旧客户端回退，不在本仓库另起 Hub。
+HUB_PORT = 8787
+HUB_LEGACY_PORT = 8790
 SOURCE_TIMES_SCHEMA = "octoooo-mini.source-times.v1"
 STALE_AFTER_MS = 5 * 60 * 1000
-PAGES = ("status", "quota", "tasks", "ask")
-PAGE_TITLES = {
-    "status": "状态",
-    "quota": "限额",
-    "tasks": "任务",
-    "ask": "待处理",
+PAGES = ("quota", "tasks", "ask")
+# Q10 数字印在字母上。不按 Alt 时 W/E/R/S = 1/2/3/4。
+# 现三页：4/S 与 3/R 都进待处理。刷新不用 R，否则挡住第 3 页。
+_PAGE_BY_KEY = {
+    "1": "quota",
+    "w": "quota",
+    "W": "quota",
+    "2": "tasks",
+    "e": "tasks",
+    "E": "tasks",
+    "3": "ask",
+    "r": "ask",
+    "R": "ask",
+    "4": "ask",
+    "s": "ask",
+    "S": "ask",
 }
-WEEKDAYS = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"]
-CONF_LABEL = {
-    "live": "新鲜",
-    "cached": "缓存",
-    "stale": "旧数据",
-    "error": "不可用",
-    "none": "无数据",
-    "unknown": "未知",
+# 默认中文。Term49 须用 GB18030 字体，见 q10-term49-font.sh。
+_UI_LANG = "zh"
+_UI = {
+    "zh": {
+        "status": "状态",
+        "quota": "限额",
+        "tasks": "任务",
+        "ask": "待处理",
+        "live": "新鲜",
+        "cached": "缓存",
+        "stale": "旧数据",
+        "error": "不可用",
+        "none": "无数据",
+        "unknown": "未知",
+        "active": "进行中",
+        "wait": "等待",
+        "idle": "空闲",
+        "done": "完成",
+        "fail": "失败",
+        "just_now": "刚刚",
+        "sec_ago": "{0}秒前",
+        "min_ago": "{0}分钟前",
+        "hr_ago": "{0}小时前",
+        "day_ago": "{0}天前",
+        "used": "已用 {0}%",
+        "time_unknown": "时间未知",
+        "unknown_tool": "未知",
+        "err_note": "采集失败，不是 0%",
+        "none_note": "缺失，不是 0%",
+        "unknown_note": "主机归属未知，不冒充新鲜",
+        "spend_note": "余额/花费口径，非订阅限额",
+        "relay_note": "中转/账号，不与限额加总",
+        "old_record": "旧记录",
+        "waiting_you": "等你",
+        "unavailable": "不可用",
+        "no_collect": "无采集时间",
+        "stats_na": "当前统计排除过期主机 · 等你 — · 人手 — · 后台 —",
+        "offline": "离线",
+        "offline_reason": "网络失败，保留旧画面",
+        "offline_prefix": "离线旧画面 · ",
+        "bad_object": "快照不是对象",
+        "bad_schema": "schema 不是 {0}",
+        "no_host_time": "无主机采集时间",
+        "collect_unknown": "采集时间未知",
+        "collect": "采集 {0}",
+        "hub_gen": "Hub生成 {0}",
+        "hub_unknown": "Hub生成时间未知",
+        "no_title": "无标题",
+        "stats": "当前统计排除过期主机 · 等你 {0} · 人手 {1} · 后台 {2}",
+        "note": "口径：窗口已用% · 账户不合计 · 余额非限额",
+        "stale_note": "采集已过期，不冒充实时 · ",
+        "demo_note": "演示数据，非本机实时 · ",
+        "offline_note": "网络失败，保留旧画面 · ",
+        "more_quota": "限额另有 {0} 项",
+        "more_tasks": "任务另有 {0} 条",
+        "host": "主机 {0}  {1}",
+        "stale_mark": "旧",
+        "no_quota": "没有限额条目",
+        "spend_head": "花费（非限额）",
+        "more_n": "另有 {0} 项",
+        "more_n_tasks": "另有 {0} 条",
+        "no_tasks": "没有任务",
+        "no_ask": "没有待处理",
+        "on_computer": "请在电脑处理",
+        "demo_ask": "演示，不是真审批",
+        "no_chat": "Q10 不提交审批 / 不做对话",
+        "footer": "1限额 2任务 3待处理  t刷新 x关闭",
+        "tbl_tool": "工具",
+        "tbl_bar": "条",
+        "tbl_pct": "已用",
+        "tbl_win": "窗",
+        "tbl_reset": "重置",
+        "tbl_host": "主机",
+        "tbl_age": "年龄",
+        "tbl_st": "态",
+        "tbl_title": "标题",
+        "tbl_amount": "金额",
+        "tbl_key": "项",
+        "tbl_value": "值",
+        "row_collect": "采集",
+        "row_hub": "Hub",
+        "row_counts": "待处理/等你/人手/后台",
+        "counts": "等你 {0} · 人手 {1} · 后台 {2}",
+        "note_short": "已用% · 账户不加总 · 花费≠限额",
+        "cell_err": "失败",
+        "cell_none": "缺失",
+        "quota_legend": "失败/缺失不是 0% · 花费≠限额",
+        "st_you": "等你",
+        "st_run": "进行",
+        "st_wait": "等待",
+        "st_idle": "空闲",
+        "st_done": "完成",
+        "st_fail": "失败",
+        "st_old": "旧",
+        "st_ok": "正常",
+        "link_usb": "USB",
+        "link_lan": "局域网",
+        "link_mailbox": "信箱",
+        "fetch_fail": "拉快照失败：{0}",
+        "weekdays": ["周一", "周二", "周三", "周四", "周五", "周六", "周日"],
+        "demo_title": "确认发布计划",
+        "demo_state": "等你确认",
+    },
+    "en": {
+        "status": "STATUS",
+        "quota": "QUOTA",
+        "tasks": "TASKS",
+        "ask": "ASK",
+        "live": "live",
+        "cached": "cached",
+        "stale": "stale",
+        "error": "error",
+        "none": "none",
+        "unknown": "unknown",
+        "active": "active",
+        "wait": "wait",
+        "idle": "idle",
+        "done": "done",
+        "fail": "fail",
+        "just_now": "just now",
+        "sec_ago": "{0}s ago",
+        "min_ago": "{0}m ago",
+        "hr_ago": "{0}h ago",
+        "day_ago": "{0}d ago",
+        "used": "used {0}%",
+        "time_unknown": "time unknown",
+        "unknown_tool": "unknown",
+        "err_note": "collect failed, not 0%",
+        "none_note": "missing, not 0%",
+        "unknown_note": "host mapping unknown",
+        "spend_note": "balance/spend, not quota",
+        "relay_note": "relay/account, not summed",
+        "old_record": "old record",
+        "waiting_you": "NEED YOU",
+        "unavailable": "unavailable",
+        "no_collect": "no collect time",
+        "stats_na": "stats skip stale hosts · need you - · human - · bg -",
+        "offline": "offline",
+        "offline_reason": "network failed, keep last screen",
+        "offline_prefix": "offline last · ",
+        "bad_object": "snapshot is not an object",
+        "bad_schema": "schema is not {0}",
+        "no_host_time": "no host collect time",
+        "collect_unknown": "collect time unknown",
+        "collect": "collect {0}",
+        "hub_gen": "hub {0}",
+        "hub_unknown": "hub time unknown",
+        "no_title": "(no title)",
+        "stats": "stats skip stale hosts · need you {0} · human {1} · bg {2}",
+        "note": "used% windows · accounts not summed · spend != quota",
+        "stale_note": "stale collect, not live · ",
+        "demo_note": "DEMO data, not live · ",
+        "offline_note": "network failed, keep last screen · ",
+        "more_quota": "{0} more quota",
+        "more_tasks": "{0} more tasks",
+        "host": "host {0}  {1}",
+        "stale_mark": "old",
+        "no_quota": "no quota rows",
+        "spend_head": "SPEND != quota",
+        "more_n": "{0} more",
+        "more_n_tasks": "{0} more",
+        "no_tasks": "no tasks",
+        "no_ask": "nothing waiting",
+        "on_computer": "handle on the computer",
+        "demo_ask": "DEMO, not a real approval",
+        "no_chat": "Q10 does not approve or chat",
+        "footer": "1 QUOTA  2 TASK  3 ASK  t x",
+        "tbl_tool": "TOOL",
+        "tbl_bar": "BAR",
+        "tbl_pct": "PCT",
+        "tbl_win": "WIN",
+        "tbl_reset": "RESET",
+        "tbl_host": "HOST",
+        "tbl_age": "AGE",
+        "tbl_st": "ST",
+        "tbl_title": "TITLE",
+        "tbl_amount": "AMOUNT",
+        "tbl_key": "KEY",
+        "tbl_value": "VALUE",
+        "row_collect": "collect",
+        "row_hub": "hub",
+        "row_counts": "ASK/you/hum/bg",
+        "counts": "need {0} · human {1} · bg {2}",
+        "note_short": "used% · accounts not summed · spend!=quota",
+        "cell_err": "ERR",
+        "cell_none": "NONE",
+        "quota_legend": "ERR/NONE != 0%  spend != quota",
+        "st_you": "YOU",
+        "st_run": "RUN",
+        "st_wait": "WAIT",
+        "st_idle": "IDLE",
+        "st_done": "DONE",
+        "st_fail": "FAIL",
+        "st_old": "OLD",
+        "st_ok": "ok",
+        "link_usb": "USB",
+        "link_lan": "LAN",
+        "link_mailbox": "box",
+        "fetch_fail": "fetch failed: {0}",
+        "weekdays": ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
+        "demo_title": "Confirm release plan",
+        "demo_state": "need confirm",
+    },
 }
-STATE_LABEL = {
-    "active": "进行中",
-    "wait": "等待",
-    "idle": "空闲",
-    "done": "完成",
-    "fail": "失败",
-}
+
+
+def set_ui_lang(lang):
+    global _UI_LANG
+    if lang in _UI:
+        _UI_LANG = lang
+    else:
+        _UI_LANG = "en"
+    return _UI_LANG
+
+
+def t(key, *args):
+    table = _UI.get(_UI_LANG) or _UI["en"]
+    text = table.get(key)
+    if text is None:
+        text = _UI["en"].get(key) or key
+    if args:
+        return text.format(*args)
+    return text
 
 
 def utcnow():
@@ -107,26 +327,76 @@ def format_age(ms):
         ms = 0
     sec = ms // 1000
     if sec < 15:
-        return "刚刚"
+        return t("just_now")
     if sec < 60:
-        return "{0}秒前".format(sec)
+        return t("sec_ago", sec)
     minutes = sec // 60
     if minutes < 60:
-        return "{0}分钟前".format(minutes)
+        return t("min_ago", minutes)
     hours = minutes // 60
     if hours < 48:
-        return "{0}小时前".format(hours)
-    return "{0}天前".format(hours // 24)
+        return t("hr_ago", hours)
+    return t("day_ago", hours // 24)
 
 
 def format_reset(iso, now):
     dt = parse_iso(iso)
     if dt is None:
-        return "—"
+        return "-"
     clock = dt.strftime("%H:%M")
     if dt.date() == now.date():
         return clock
-    return "{0} {1}".format(WEEKDAYS[dt.weekday()], clock)
+    days = t("weekdays")
+    return "{0} {1}".format(days[dt.weekday()], clock)
+
+
+# --lang en 时把窗口名收成 ASCII，方便无汉字字体的终端。
+_WIN_KEY_EN = {
+    "三方": "3rd",
+    "自有": "own",
+    "本周": "week",
+    "月": "mo",
+    "预算": "budg",
+}
+
+
+def ascii_en_text(text, fallback=""):
+    raw = str(text or "")
+    if _UI_LANG != "en":
+        return raw
+    keep = []
+    for ch in raw:
+        if ord(ch) < 128 or ch in "¥€£":
+            keep.append(ch)
+    out = " ".join("".join(keep).split())
+    return out if out else fallback
+
+
+def window_key_label(key):
+    raw = str(key or "").strip()
+    if _UI_LANG == "en" and raw in _WIN_KEY_EN:
+        return _WIN_KEY_EN[raw]
+    if _UI_LANG == "en":
+        ascii_only = "".join(ch for ch in raw if ord(ch) < 128).strip()
+        return ascii_only or "win"
+    return raw or "-"
+
+
+def _host_status_label(status):
+    raw = str(status or "").strip().lower()
+    mapping = {
+        "ok": "st_ok",
+        "online": "st_ok",
+        "up": "st_ok",
+        "error": "st_fail",
+        "fail": "st_fail",
+        "down": "st_fail",
+        "offline": "offline",
+        "stale": "st_old",
+    }
+    if raw in mapping:
+        return t(mapping[raw])
+    return status or t("st_ok")
 
 
 def folder_label(project):
@@ -264,8 +534,9 @@ def _windows(sub, now):
         out.append(
             {
                 "key": key,
+                "key_label": window_key_label(key),
                 "used_pct": pct,
-                "used_label": "已用 {0}%".format(pct),
+                "used_label": t("used", pct),
                 "resets_label": format_reset(raw.get("resetsAt"), now),
             }
         )
@@ -278,9 +549,9 @@ def _quota_age_label(host_ids, conf, seen_map, stale_ids, known_ids, now, collec
     if collected_at is not None:
         return _format_seen_age(collected_at, now)
     if conf == "cached":
-        return "时间未知"
+        return t("time_unknown")
     if conf == "unknown" or not host_ids:
-        return "时间未知"
+        return t("time_unknown")
     chosen = None
     for hid in host_ids:
         if hid not in known_ids:
@@ -299,7 +570,7 @@ def _quota_age_label(host_ids, conf, seen_map, stale_ids, known_ids, now, collec
             if chosen is None or seen > chosen:
                 chosen = seen
     if chosen is None:
-        return "时间未知"
+        return t("time_unknown")
     return _format_seen_age(chosen, now)
 
 
@@ -307,34 +578,34 @@ def _quota_item(sub, now, stale_ids, known_ids, seen_map):
     kind = str(sub.get("kind") or "quota")
     conf = _effective_sub_confidence(sub, stale_ids, known_ids)
     source = str(sub.get("source") or "local")
-    tool = str(sub.get("tool") or "未知")
+    tool = str(sub.get("tool") or t("unknown_tool"))
     label = str(sub.get("label") or tool)
     is_quota = kind == "quota" or (kind == "" and source == "local")
     windows = _windows(sub, now)
     note = ""
     if conf == "error":
-        status = "不可用"
+        status = t("error")
         windows = []
-        note = "采集失败，不是 0%"
+        note = t("err_note")
     elif conf == "none" or not windows:
-        status = "无数据"
+        status = t("none")
         windows = []
-        note = "缺失，不是 0%"
+        note = t("none_note")
     elif conf == "unknown":
-        status = "未知"
-        note = "主机归属未知，不冒充新鲜"
+        status = t("unknown")
+        note = t("unknown_note")
     elif conf == "stale":
-        status = "旧数据"
+        status = t("stale")
     elif conf == "cached":
-        status = "缓存"
+        status = t("cached")
     else:
-        status = "新鲜"
+        status = t("live")
     if kind == "spend":
         is_quota = False
-        note = "余额/花费口径，非订阅限额"
+        note = t("spend_note")
     elif kind in ("site", "account", "member", "key"):
         is_quota = False
-        note = "中转/账号，不与限额加总"
+        note = t("relay_note")
     return {
         "id": str(sub.get("id") or "{0}:{1}".format(tool, label)),
         "tool": tool,
@@ -375,10 +646,13 @@ def _is_current_wait(run, stale_ids, known_ids):
 
 def _state_label(run, stale):
     if stale:
-        return "旧记录"
+        return t("old_record")
     if _waiting_you(run):
-        return "等你"
-    return STATE_LABEL.get(str(run.get("state") or ""), "未知")
+        return t("waiting_you")
+    key = str(run.get("state") or "")
+    if key in ("active", "wait", "idle", "done", "fail"):
+        return t(key)
+    return t("unknown")
 
 
 def _attention_counts(runs):
@@ -410,10 +684,10 @@ def demo_attention_items():
     return [
         {
             "id": "demo-confirm",
-            "title": "确认发布计划",
-            "project": "Demo",
+            "title": t("demo_title"),
+            "project": "演示",
             "tool": "Claude",
-            "state_label": "等你确认",
+            "state_label": t("demo_state"),
             "host_id": "demo",
             "computer_hint": False,
             "demo": True,
@@ -423,15 +697,15 @@ def demo_attention_items():
 
 def unavailable_model(reason, demo=False):
     return {
-        "source": "不可用",
+        "source": t("unavailable"),
         "demo": demo,
         "schema_ok": False,
         "offline": False,
-        "freshness": "不可用",
-        "collected_label": "无采集时间",
+        "freshness": t("unavailable"),
+        "collected_label": t("no_collect"),
         "hub_generated_label": "",
         "age_label": "",
-        "stats_line": "当前统计排除过期主机 · 等你 — · 人手 — · 后台 —",
+        "stats_line": t("stats_na"),
         "note": reason,
         "quota_items": [],
         "spend_items": [],
@@ -446,17 +720,21 @@ def unavailable_model(reason, demo=False):
         "rotate_hint": "",
         "hosts": [],
         "hub_label": "",
+        "link": "",
+        "url": "",
     }
 
 
-def mark_offline(model, reason="网络失败，保留旧画面"):
+def mark_offline(model, reason=None):
+    if reason is None:
+        reason = t("offline_reason")
     out = dict(model)
     out["offline"] = True
-    out["freshness"] = "离线"
+    out["freshness"] = t("offline")
     out["note"] = reason + " · " + (model.get("note") or "")
     stats = model.get("stats_line") or ""
-    if "离线" not in stats:
-        out["stats_line"] = stats.replace("当前", "离线旧画面 · 当前")
+    if t("offline") not in stats:
+        out["stats_line"] = t("offline_prefix") + stats
     return out
 
 
@@ -465,16 +743,19 @@ def adapt(
     now=None,
     demo=False,
     offline=False,
-    source="http://127.0.0.1:8790/snapshot.json",
+    source="http://127.0.0.1:8787/snapshot.json",
     rotate=0,
     quota_limit=None,
     task_limit=None,
+    lang=None,
 ):
+    if lang:
+        set_ui_lang(lang)
     clock = now or utcnow()
     if not isinstance(snapshot, dict):
-        return unavailable_model("快照不是对象", demo=demo)
+        return unavailable_model(t("bad_object"), demo=demo)
     if snapshot.get("schema") != SNAPSHOT_SCHEMA:
-        return unavailable_model("schema 不是 {0}".format(SNAPSHOT_SCHEMA), demo=demo)
+        return unavailable_model(t("bad_schema", SNAPSHOT_SCHEMA), demo=demo)
 
     stale_ids = _stale_host_ids(snapshot, clock)
     collected, age_ms = _last_collected(snapshot, clock)
@@ -483,25 +764,26 @@ def adapt(
     known_ids = set(str(h.get("id") or "") for h in hosts if h.get("id"))
     live_hosts = [h for h in hosts if str(h.get("id") or "") not in stale_ids]
     if not hosts:
-        freshness = "不可用"
-        collected_label = "无主机采集时间"
+        freshness = t("unavailable")
+        collected_label = t("no_host_time")
     elif not live_hosts:
-        freshness = "旧数据"
-        collected_label = "采集 {0}".format(format_age(age_ms)) if collected else "采集时间未知"
+        freshness = t("stale")
+        collected_label = t("collect", format_age(age_ms)) if collected else t("collect_unknown")
     elif age_ms > STALE_AFTER_MS:
-        freshness = "旧数据"
-        collected_label = "采集 {0}".format(format_age(age_ms))
+        freshness = t("stale")
+        collected_label = t("collect", format_age(age_ms))
     else:
-        freshness = "新鲜"
-        collected_label = "采集 {0}".format(format_age(age_ms))
+        freshness = t("live")
+        collected_label = t("collect", format_age(age_ms))
 
     generated = parse_iso(snapshot.get("generatedAt"))
     if generated:
-        hub_generated_label = "Hub生成 {0}".format(
-            format_age(max(0, int((clock - generated).total_seconds() * 1000)))
+        hub_generated_label = t(
+            "hub_gen",
+            format_age(max(0, int((clock - generated).total_seconds() * 1000))),
         )
     else:
-        hub_generated_label = "Hub生成时间未知"
+        hub_generated_label = t("hub_unknown")
 
     quota_all = []
     spend_all = []
@@ -519,7 +801,7 @@ def adapt(
         windows = item["windows"]
         if windows:
             return (0, -max(w["used_pct"] for w in windows), item["tool"])
-        if item["status_label"] == "不可用":
+        if item["confidence"] == "error":
             return (1, 0, item["tool"])
         return (2, 0, item["tool"])
 
@@ -543,7 +825,7 @@ def adapt(
             continue
         host_id = str(run.get("hostId") or "")
         stale = host_id in stale_ids
-        title = str(run.get("title") or "").strip() or "无标题"
+        title = str(run.get("title") or "").strip() or t("no_title")
         is_wait = _is_current_wait(run, stale_ids, known_ids)
         tasks_all.append(
             {
@@ -558,7 +840,7 @@ def adapt(
                 "octoooo": is_octoooo(run),
                 "host_id": host_id,
                 "age_label": (
-                    _format_seen_age(seen_map[host_id], clock) if host_id in seen_map else "时间未知"
+                    _format_seen_age(seen_map[host_id], clock) if host_id in seen_map else t("time_unknown")
                 ),
             }
         )
@@ -569,7 +851,7 @@ def adapt(
                     "title": title,
                     "project": folder_label(run.get("project")),
                     "tool": str(run.get("tool") or ""),
-                    "state_label": "等你",
+                    "state_label": t("waiting_you"),
                     "host_id": host_id,
                     "computer_hint": True,
                     "demo": False,
@@ -592,37 +874,38 @@ def adapt(
     if demo:
         attention_all = demo_attention_items() + attention_all
 
-    stats_line = "当前统计排除过期主机 · 等你 {0} · 人手 {1} · 后台 {2}".format(
-        waiting, human, background
-    )
-    note = "口径：窗口已用% · 账户不合计 · 余额非限额"
-    if freshness == "旧数据":
-        note = "采集已过期，不冒充实时 · " + note
+    stats_line = t("stats", waiting, human, background)
+    note = t("note")
+    if freshness == t("stale"):
+        note = t("stale_note") + note
     if demo:
-        note = "DEMO 示例数据，非本机实时 · " + note
+        note = t("demo_note") + note
     if offline:
-        freshness = "离线"
-        note = "网络失败，保留旧画面 · " + note
+        freshness = t("offline")
+        note = t("offline_note") + note
 
     extra = []
     if hidden_quota:
-        extra.append("限额另有 {0} 项".format(hidden_quota))
+        extra.append(t("more_quota", hidden_quota))
     if hidden_tasks:
-        extra.append("任务另有 {0} 条".format(hidden_tasks))
+        extra.append(t("more_tasks", hidden_tasks))
     rotate_hint = " · ".join(extra)
     hub = (snapshot.get("hub") or {}).get("label") or "Aindle"
     host_rows = []
     for host in hosts:
+        hid = str(host.get("id") or "")
+        seen = seen_map.get(hid)
         host_rows.append(
             {
-                "id": str(host.get("id") or ""),
-                "label": str(host.get("label") or host.get("id") or ""),
+                "id": hid,
+                "label": str(host.get("label") or hid or ""),
                 "status": str(host.get("status") or ""),
-                "stale": str(host.get("id") or "") in stale_ids,
+                "stale": hid in stale_ids,
+                "age_short": _format_seen_age(seen, clock) if seen else "?",
             }
         )
     return {
-        "source": ("DEMO · {0}".format(hub) if demo else "Aindle · {0}".format(hub)),
+        "source": ("演示 · {0}".format(hub) if demo else hub),
         "demo": demo,
         "schema_ok": True,
         "offline": offline,
@@ -646,6 +929,7 @@ def adapt(
         "hosts": host_rows,
         "hub_label": hub,
         "url": source,
+        "link": hub_link_kind(source),
     }
 
 
@@ -655,7 +939,49 @@ def load_json_file(path):
     return json.loads(raw.decode("utf-8"))
 
 
-def fetch_snapshot(url, timeout=8):
+def _mailbox_token():
+    env = os.environ.get("Q10_MAILBOX_TOKEN", "").strip()
+    if env:
+        return env
+    hinted = os.environ.get("Q10_MAILBOX_TOKEN_FILE", "").strip()
+    paths = []
+    if hinted:
+        paths.append(hinted)
+    paths.append("/accounts/1000/shared/misc/q10-mailbox.token")
+    for path in paths:
+        if not path:
+            continue
+        try:
+            if not os.path.isfile(path):
+                continue
+            fh = open(path, "rb")
+            try:
+                raw = fh.read()
+            finally:
+                fh.close()
+        except Exception:
+            continue
+        text = raw.decode("utf-8").strip() if not isinstance(raw, str) else raw.strip()
+        if text:
+            return text
+    return ""
+
+
+def _curl_bin():
+    hinted = os.environ.get("Q10_CURL", "").strip()
+    if hinted:
+        return hinted
+    for path in (
+        "/accounts/1000/shared/misc/berrycore/bin/curl",
+        "/usr/bin/curl",
+        "/opt/homebrew/bin/curl",
+    ):
+        if os.path.isfile(path) and os.access(path, os.X_OK):
+            return path
+    return "curl"
+
+
+def _fetch_urllib(url, timeout):
     try:
         from urllib.request import Request, urlopen
     except ImportError:
@@ -675,6 +1001,26 @@ def fetch_snapshot(url, timeout=8):
     return json.loads(raw)
 
 
+def _fetch_curl(url, timeout, token):
+    import subprocess
+
+    cmd = [_curl_bin(), "-sS", "-f", "-m", str(int(timeout)), "-H", "Accept: application/json"]
+    if token:
+        cmd.extend(["-H", "Authorization: Bearer {0}".format(token)])
+    cmd.append(url)
+    raw = subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+    if not isinstance(raw, str):
+        raw = raw.decode("utf-8", "replace")
+    return json.loads(raw)
+
+
+def fetch_snapshot(url, timeout=8):
+    token = _mailbox_token()
+    if url.lower().startswith("https://"):
+        return _fetch_curl(url, timeout, token)
+    return _fetch_urllib(url, timeout)
+
+
 def _slash30_peer(ip):
     parts = ip.split(".")
     if len(parts) != 4:
@@ -692,10 +1038,7 @@ def _slash30_peer(ip):
     return None
 
 
-def guess_hub_url():
-    hinted = os.environ.get("Q10_MONITOR_URL", "").strip()
-    if hinted:
-        return hinted
+def _usb_hub_url():
     peer = None
     try:
         import subprocess
@@ -712,8 +1055,316 @@ def guess_hub_url():
     except Exception:
         peer = None
     if peer:
-        return "http://{0}:8790/snapshot.json".format(peer)
-    return "http://169.254.0.2:8790/snapshot.json"
+        return "http://{0}:{1}/snapshot.json".format(peer, HUB_PORT)
+    return ""
+
+
+def _urlparse(url):
+    try:
+        from urllib.parse import urlparse
+    except ImportError:
+        from urlparse import urlparse
+    return urlparse(url)
+
+
+def _url_host(url):
+    try:
+        return (_urlparse(url).hostname or "").strip()
+    except Exception:
+        return ""
+
+
+def hub_ports(raw=None):
+    if raw is None:
+        raw = os.environ.get("Q10_HUB_PORTS", "").strip()
+        if not raw:
+            raw = os.environ.get("AINDLE_PORT", "").strip()
+    ports = []
+    text = str(raw or "").replace(" ", ",")
+    for part in text.split(","):
+        part = part.strip()
+        if not part.isdigit():
+            continue
+        port = int(part)
+        if 1 <= port <= 65535 and port not in ports:
+            ports.append(port)
+    for port in (HUB_PORT, HUB_LEGACY_PORT):
+        if port not in ports:
+            ports.append(port)
+    return ports
+
+
+def replace_url_port(url, port):
+    try:
+        from urllib.parse import urlunparse
+    except ImportError:
+        from urlparse import urlunparse
+    parsed = _urlparse(url)
+    host = (parsed.hostname or "").strip()
+    if not host:
+        return url
+    auth = ""
+    if parsed.username:
+        auth = parsed.username
+        if parsed.password:
+            auth += ":" + parsed.password
+        auth += "@"
+    netloc = "{0}{1}:{2}".format(auth, host, int(port))
+    path = parsed.path or "/snapshot.json"
+    return urlunparse(
+        (parsed.scheme, netloc, path, parsed.params, parsed.query, parsed.fragment)
+    )
+
+
+def expand_http_ports(url, ports=None):
+    if not url:
+        return []
+    if str(url).lower().startswith("https://"):
+        return [url]
+    out = [url]
+    for port in ports or hub_ports():
+        cand = replace_url_port(url, port)
+        if cand and cand not in out:
+            out.append(cand)
+    return out
+
+
+def last_hub_path():
+    hinted = os.environ.get("Q10_HUB_LAST_FILE", "").strip()
+    if hinted:
+        return hinted
+    device = "/accounts/1000/shared/misc/q10-hub.last"
+    if os.path.isdir("/accounts/1000/shared/misc"):
+        return device
+    return os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), "..", "local-config", "q10-hub.last"
+    )
+
+
+def _valid_hub_url(url):
+    text = str(url or "").strip()
+    if not text or len(text) > 300 or "\n" in text or " " in text:
+        return ""
+    low = text.lower()
+    if not (low.startswith("http://") or low.startswith("https://")):
+        return ""
+    return text
+
+
+def read_last_hub_url():
+    path = last_hub_path()
+    try:
+        fh = open(path, "rb")
+        try:
+            raw = fh.read()
+        finally:
+            fh.close()
+    except Exception:
+        return ""
+    if not isinstance(raw, str):
+        raw = raw.decode("utf-8", "replace")
+    return _valid_hub_url(raw.splitlines()[0] if raw else "")
+
+
+def write_last_hub_url(url):
+    text = _valid_hub_url(url)
+    if not text:
+        return False
+    path = last_hub_path()
+    parent = os.path.dirname(path)
+    try:
+        if parent and not os.path.isdir(parent):
+            os.makedirs(parent)
+        fh = open(path, "w")
+        try:
+            fh.write(text + "\n")
+        finally:
+            fh.close()
+    except Exception:
+        return False
+    return True
+
+
+def on_qnx_device():
+    if os.path.isdir("/accounts/1000/shared/misc"):
+        return True
+    try:
+        return os.uname()[0] == "QNX"
+    except Exception:
+        return False
+
+
+def _loopback_hub_url():
+    if on_qnx_device():
+        return ""
+    return "http://127.0.0.1:{0}/snapshot.json".format(HUB_PORT)
+
+
+def _same_lan(host, local_ips):
+    hp = str(host or "").split(".")
+    if len(hp) != 4:
+        return False
+    for ip in local_ips or []:
+        pp = str(ip or "").split(".")
+        if len(pp) == 4 and pp[:3] == hp[:3]:
+            return True
+    return False
+
+
+def _local_ipv4s():
+    ips = []
+    try:
+        import subprocess
+
+        out = subprocess.check_output(["ifconfig"], stderr=subprocess.STDOUT)
+        if not isinstance(out, str):
+            out = out.decode("utf-8", "replace")
+        for line in out.splitlines():
+            parts = line.split()
+            if len(parts) >= 2 and parts[0] == "inet":
+                ip = parts[1]
+                if ip and ip != "127.0.0.1":
+                    ips.append(ip)
+    except Exception:
+        pass
+    return ips
+
+
+def filter_hub_urls(forced, usb, lan, mailbox, local_ips):
+    if forced:
+        return [forced]
+    out = []
+    if usb:
+        out.append(usb)
+    if lan and _same_lan(_url_host(lan), local_ips):
+        if lan not in out:
+            out.append(lan)
+    if mailbox and mailbox not in out:
+        out.append(mailbox)
+    if not out:
+        out.append("http://169.254.0.2:{0}/snapshot.json".format(HUB_PORT))
+    return out
+
+
+def resolve_hub_urls(forced, usb, lan, mailbox, local_ips, last="", ports=None):
+    """Transport order + short port list. last-good is first unless it is HTTPS while USB/LAN is here."""
+    ports = ports or hub_ports()
+    lan_ok = bool(lan and _same_lan(_url_host(lan), local_ips))
+    prefer_direct = bool(usb) or lan_ok
+    last = _valid_hub_url(last)
+    bases = []
+    if last and not (prefer_direct and last.lower().startswith("https://")):
+        bases.append(last)
+    for url in (forced, usb, _loopback_hub_url()):
+        if url and url not in bases:
+            bases.append(url)
+    if lan_ok and lan not in bases:
+        bases.append(lan)
+    if last and last not in bases:
+        bases.append(last)
+    if mailbox and mailbox not in bases:
+        bases.append(mailbox)
+    if not bases:
+        bases.append("http://169.254.0.2:{0}/snapshot.json".format(HUB_PORT))
+    out = []
+    for url in bases:
+        for cand in expand_http_ports(url, ports):
+            if cand not in out:
+                out.append(cand)
+    return out
+
+
+def list_hub_urls():
+    return resolve_hub_urls(
+        os.environ.get("Q10_MONITOR_URL", "").strip(),
+        _usb_hub_url(),
+        os.environ.get("Q10_LAN_HUB_URL", "").strip(),
+        os.environ.get("Q10_MAILBOX_URL", "").strip(),
+        _local_ipv4s(),
+        read_last_hub_url(),
+    )
+
+
+def guess_hub_url():
+    urls = list_hub_urls()
+    return urls[0] if urls else "http://169.254.0.2:{0}/snapshot.json".format(HUB_PORT)
+
+
+_HOST_SHORT = {
+    "MacBook Pro": "MBP",
+    "Mac mini": "Mini",
+    "Mac Mini": "Mini",
+    "Demo Hub": "Demo",
+}
+
+
+def short_host(label):
+    raw = str(label or "").strip()
+    if raw in _HOST_SHORT:
+        return _HOST_SHORT[raw]
+    low = raw.lower()
+    if low == "mac mini":
+        return "Mini"
+    if low == "macbook pro":
+        return "MBP"
+    return raw
+
+
+def join_dot(parts):
+    out = []
+    for part in parts:
+        text = str(part or "").strip()
+        if text:
+            out.append(text)
+    return " · ".join(out)
+
+
+def pad_lr(left, right, width):
+    right = str(right or "")
+    left = str(left or "")
+    if not right:
+        return clip(left, width)
+    left = clip(left, max(1, width - len(right) - 1))
+    gap = width - len(left) - len(right)
+    if gap < 0:
+        return clip(left + right, width)
+    return left + (" " * gap) + right
+
+
+def hub_link_kind(url):
+    text = str(url or "")
+    low = text.lower()
+    if low.startswith("https://"):
+        return t("link_mailbox")
+    if "169.254." in text:
+        return t("link_usb")
+    if low.startswith("http://"):
+        return t("link_lan")
+    return ""
+
+
+def fetch_timeout_for(url):
+    if str(url or "").lower().startswith("https://"):
+        return 12
+    return 3
+
+
+def fetch_first_snapshot(urls, fetch_fn=None):
+    if fetch_fn is None:
+        fetch_fn = fetch_snapshot
+    last_err = None
+    for url in urls or []:
+        try:
+            snap = fetch_fn(url, fetch_timeout_for(url))
+            if isinstance(snap, dict) and snap.get("schema") == SNAPSHOT_SCHEMA:
+                write_last_hub_url(url)
+                return snap, url
+            last_err = ValueError("bad snapshot")
+        except Exception as exc:
+            last_err = exc
+    if last_err is None:
+        raise IOError("no hub url")
+    raise last_err
 
 
 def here(*parts):
@@ -738,16 +1389,106 @@ def clip(text, width):
         return ""
     if len(text) <= width:
         return text
+    if _UI_LANG == "en":
+        if width <= 2:
+            return text[:width]
+        return text[: width - 2] + ".."
     if width == 1:
         return text[:1]
     return text[: width - 1] + "…"
 
 
-def bar(pct, width=10):
-    width = max(4, int(width))
+# 结构性字符按界面语言选：中文模式用等宽黑体里验证过的 ─ · █，
+# --lang en 面向无汉字字体的终端，退回纯 ASCII。
+_ART = {
+    "zh": {"rule": "─", "dot": "·", "fill": "█", "mark": "●"},
+    "en": {"rule": "-", "dot": ".", "fill": "#", "mark": "*"},
+}
+
+
+def _art(key):
+    return _ART.get(_UI_LANG, _ART["en"]).get(key) or "."
+
+
+def rule_line(width):
+    return _art("rule") * max(1, int(width))
+
+
+def art_bar(pct, width):
+    width = max(3, int(width))
     filled = int(round((pct / 100.0) * width))
     filled = min(width, max(0, filled))
-    return "[" + ("#" * filled) + ("." * (width - filled)) + "]"
+    return _art("fill") * filled + _art("dot") * (width - filled)
+
+
+def leader_lr(left, right, width):
+    """左标签 …… 右值，中间点线补齐；太挤时退回空格分隔。"""
+    left = str(left or "")
+    right = str(right or "")
+    if not right:
+        return clip(left, width)
+    dots = width - len(left) - len(right)
+    if dots < 2:
+        return pad_lr(left, right, width)
+    return left + (_art("dot") * dots) + right
+
+
+def quota_pct_cell(item, win):
+    conf = item.get("confidence")
+    if conf == "error":
+        return t("cell_err")
+    if conf == "none" or not item.get("windows"):
+        return t("cell_none")
+    if conf == "unknown" and not win:
+        return "?"
+    if win is None:
+        return t("cell_none")
+    return "{0:d}%".format(win["used_pct"])
+
+
+def quota_tool_cell(item, used):
+    name = ascii_en_text(item.get("tool") or "?") or "?"
+    if name not in used:
+        used[name] = 1
+        return name
+    extra = ascii_en_text(item.get("label") or "")
+    extra = extra.replace(name, "").strip(" ·-.")
+    if extra:
+        return extra
+    used[name] += 1
+    return "{0}{1}".format(name[:6], used[name])
+
+
+def task_st(item):
+    if item.get("waiting_you"):
+        return t("st_you")
+    if item.get("is_stale_record"):
+        return t("st_old")
+    key = str(item.get("state") or "")
+    mapping = {
+        "active": "st_run",
+        "wait": "st_wait",
+        "idle": "st_idle",
+        "done": "st_done",
+        "fail": "st_fail",
+    }
+    if key in mapping:
+        return t(mapping[key])
+    return "?"
+
+
+def flatten_quota_rows(items):
+    used = {}
+    rows = []
+    for item in items:
+        tool = quota_tool_cell(item, used)
+        wins = item.get("windows") or []
+        if not wins:
+            rows.append((item, None, tool))
+            continue
+        for win in wins:
+            rows.append((item, win, tool))
+    return rows
 
 
 def write_out(text):
@@ -770,11 +1511,11 @@ def clear_screen():
     write_out("\033[2J\033[H")
 
 
-def term_width(default=42):
+def term_width(default=36):
     env = os.environ.get("COLUMNS")
     if env:
         try:
-            return max(32, min(80, int(env)))
+            return max(28, min(80, int(env)))
         except ValueError:
             pass
     try:
@@ -784,112 +1525,247 @@ def term_width(default=42):
 
         packed = fcntl.ioctl(1, termios.TIOCGWINSZ, struct.pack("HHHH", 0, 0, 0, 0))
         _rows, cols = struct.unpack("HHHH", packed)[:2]
-        if cols >= 32:
+        if cols >= 28:
             return min(80, int(cols))
     except Exception:
         pass
     return default
 
 
-def render_page(model, page, width=42, offset=0):
+def _page_header(model, page, width):
+    title = t(page) if page in PAGES else page
+    if page == "ask":
+        n_ask = len(model.get("attention") or [])
+        if n_ask:
+            title = "{0}({1})".format(title, n_ask)
+    hub = model.get("hub_label") or ""
+    if hub.startswith("Aindle · "):
+        hub = hub[9:]
+    if hub.startswith("演示"):
+        hub = "演示"
+    if hub.startswith("DEMO"):
+        hub = "DEMO"
+    left = join_dot([title, model.get("freshness") or ""])
+    right = join_dot([model.get("link") or "", short_host(hub)])
+    return pad_lr(left, right, width)
+
+
+def _age_text(model):
+    collect_val = model.get("age_label") or model.get("collected_label") or ""
+    if collect_val.startswith("collect "):
+        collect_val = collect_val[8:]
+    elif collect_val.startswith("采集 "):
+        collect_val = collect_val[3:]
+    return collect_val
+
+
+def _quota_geom(width):
+    tool_w = 7
+    win_w = 3
+    pct_w = 4
+    gaps = 3
+    bar_w = width - tool_w - win_w - pct_w - gaps
+    if bar_w < 4:
+        tool_w = 6
+        bar_w = width - tool_w - win_w - pct_w - gaps
+    if bar_w < 3:
+        bar_w = 3
+        tool_w = max(4, width - win_w - pct_w - bar_w - gaps)
+    return tool_w, win_w, max(3, bar_w), pct_w
+
+
+def term_height(default=0):
+    env = os.environ.get("LINES")
+    if env:
+        try:
+            rows = int(env)
+            if 8 <= rows <= 80:
+                return rows
+        except ValueError:
+            pass
+    try:
+        import struct
+        import fcntl
+        import termios
+
+        packed = fcntl.ioctl(1, termios.TIOCGWINSZ, struct.pack("HHHH", 0, 0, 0, 0))
+        rows, _cols = struct.unpack("HHHH", packed)[:2]
+        if rows >= 8:
+            return min(80, int(rows))
+    except Exception:
+        pass
+    return default
+
+
+def _tasks_body(model, width, offset, budget):
+    lines = [
+        clip(
+            t(
+                "counts",
+                model.get("waiting") or 0,
+                model.get("human") or 0,
+                model.get("background") or 0,
+            ),
+            width,
+        )
+    ]
+    age = _age_text(model)
+    if age:
+        lines.append(leader_lr(t("row_collect"), age, width))
+    for host in model.get("hosts") or []:
+        mark = t("st_old") if host.get("stale") else _host_status_label(host.get("status"))
+        name = short_host(ascii_en_text(host.get("label") or host.get("id") or "") or "?")
+        lines.append(leader_lr(name, join_dot([host.get("age_short") or "", mark]), width))
+    lines.append(rule_line(width))
+    items = model.get("tasks") or []
+    if not items:
+        lines.append(t("no_tasks"))
+        return lines
+    start = offset % len(items)
+    ordered = items[start:] + items[:start]
+    hidden = model.get("hidden_tasks") or 0
+    if budget:
+        allow = max(1, budget - len(lines) - 1)
+        if len(ordered) > allow:
+            hidden += len(ordered) - allow
+            ordered = ordered[:allow]
+    st_w = 4 if _UI_LANG == "en" else 2
+    proj_w = min(10, max(0, width - 22))
+    for item in ordered:
+        mark = _art("mark") if item.get("waiting_you") else " "
+        st = clip(task_st(item), st_w).ljust(st_w)
+        title = ascii_en_text(item.get("title") or "", "?")
+        proj = clip(ascii_en_text(item.get("project") or item.get("tool") or ""), proj_w)
+        room = width - st_w - 3 - (len(proj) + 1 if proj else 0)
+        left = "{0} {1} {2}".format(mark, st, clip(title, max(1, room)))
+        gap = width - len(left) - len(proj)
+        # 手工拼行：pad_lr 里的 clip 会把 mark 列的前导空格 strip 掉。
+        lines.append(left + (" " * max(1, gap)) + proj if proj else left)
+    if hidden:
+        lines.append(clip(t("more_n_tasks", hidden) + " · j/k", width))
+    return lines
+
+
+def _ask_body(model, width, offset):
+    items = model.get("attention") or []
     lines = []
-    title = PAGE_TITLES.get(page, page)
-    head = "Q10 {0}  {1}  {2}".format(title, model.get("freshness") or "", model.get("source") or "")
-    lines.append(clip(head, width))
-    lines.append("-" * min(width, 42))
-    if page == "status":
-        lines.append(clip(model.get("collected_label") or "", width))
-        lines.append(clip(model.get("hub_generated_label") or "", width))
-        lines.append(clip(model.get("stats_line") or "", width))
-        ask_n = len(model.get("attention") or [])
-        lines.append("ASK {0}".format(ask_n))
-        for host in model.get("hosts") or []:
-            mark = "旧" if host.get("stale") else (host.get("status") or "ok")
-            lines.append(clip("主机 {0}  {1}".format(host.get("label") or host.get("id"), mark), width))
-        lines.append(clip(model.get("note") or "", width))
-        if model.get("rotate_hint"):
-            lines.append(clip(model.get("rotate_hint"), width))
-    elif page == "quota":
-        items = model.get("quota_items") or []
-        if not items:
-            lines.append("没有限额条目")
-        else:
-            start = offset % len(items) if items else 0
-            ordered = items[start:] + items[:start]
-            for item in ordered:
-                lines.append(
-                    clip(
-                        "{0}  {1}  {2}".format(
-                            item.get("tool"), item.get("status_label"), item.get("age_label") or ""
-                        ),
-                        width,
-                    )
-                )
-                if item.get("windows"):
-                    for win in item["windows"]:
-                        chunk = "{0} {1} {2} {3}".format(
-                            bar(win["used_pct"], 8),
-                            win["used_label"],
-                            win["key"],
-                            win.get("resets_label") or "",
-                        )
-                        lines.append("  " + clip(chunk, width - 2))
-                if item.get("note"):
-                    lines.append("  " + clip(item["note"], width - 2))
-        spends = model.get("spend_items") or []
-        if spends:
-            lines.append(clip("—— 余额（非限额）——", width))
-            for item in spends:
-                lines.append(clip("{0}  {1}".format(item.get("tool"), item.get("label")), width))
-                lines.append("  " + clip(item.get("note") or "", width - 2))
-        if model.get("hidden_quota"):
-            lines.append("另有 {0} 项".format(model["hidden_quota"]))
+    if not items:
+        lines += ["", t("no_ask")]
+    else:
+        banner = _art("fill") * width
+        lines.append(banner)
+        start = offset % len(items)
+        ordered = items[start:] + items[:start]
+        proj_w = min(10, max(0, width - 22))
+        for item in ordered:
+            tool = clip(ascii_en_text(item.get("tool") or "") or "?", 7)
+            title = ascii_en_text(item.get("title") or "", "?")
+            proj = clip(ascii_en_text(item.get("project") or ""), proj_w)
+            lines.append(
+                pad_lr("{0} {1} {2}".format(_art("mark"), tool, title), proj, width)
+            )
+        lines.append(banner)
+        if any(item.get("computer_hint") for item in ordered):
+            lines.append(clip(t("on_computer"), width))
+        if any(item.get("demo") for item in ordered):
+            lines.append(clip(t("demo_ask"), width))
+    lines.append("")
+    lines.append(clip(t("no_chat"), width))
+    return lines
+
+
+def page_for_key(key):
+    return _PAGE_BY_KEY.get(key)
+
+
+def is_refresh_key(key):
+    return key in ("t", "T", None)
+
+
+def ask_jump(seen_ids, model):
+    """刷新后出现新的待处理 id 才跳页；清空后重置。返回 (是否跳, 新已见集合)。"""
+    ids = set()
+    for item in model.get("attention") or []:
+        iid = str(item.get("id") or "")
+        if iid:
+            ids.add(iid)
+    if ids and not ids.issubset(seen_ids):
+        return True, ids
+    return False, ids
+
+
+def _quota_body(model, width, offset, budget):
+    items = model.get("quota_items") or []
+    lines = []
+    tail = []
+    spends = model.get("spend_items") or []
+    if spends:
+        tail.append(rule_line(width))
+        for item in spends:
+            amount = ascii_en_text(item.get("label") or "") or (item.get("label") or "")
+            tool = clip(ascii_en_text(item.get("tool") or "") or "?", 8)
+            tail.append(leader_lr(tool, amount, width))
+    tail.append(clip(t("quota_legend"), width))
+    if not items:
+        lines.append(t("no_quota"))
+    else:
+        tool_w, win_w, bar_w, pct_w = _quota_geom(width)
+        flat = flatten_quota_rows(items)
+        start = offset % len(flat) if flat else 0
+        ordered = flat[start:] + flat[:start]
+        hidden = model.get("hidden_quota") or 0
+        if budget:
+            allow = max(1, budget - len(tail) - 1)
+            if len(ordered) > allow:
+                hidden += len(ordered) - allow
+                ordered = ordered[:allow]
+        prev = None
+        for item, win, tool in ordered:
+            if tool == prev:
+                name = " " * tool_w
+            else:
+                name = clip(tool, tool_w).ljust(tool_w)
+            prev = tool
+            if win is None:
+                win_s = "-".ljust(win_w)
+                bar_s = _art("dot") * bar_w
+                pct = clip(quota_pct_cell(item, None), pct_w).rjust(pct_w)
+            else:
+                win_s = clip(win.get("key_label") or win.get("key") or "-", win_w).ljust(win_w)
+                bar_s = art_bar(win["used_pct"], bar_w)
+                pct = clip(quota_pct_cell(item, win), pct_w).rjust(pct_w)
+            # 行宽由 _quota_geom 精确拼出，不能再过 clip（clip 会 strip 掉缩进）。
+            lines.append("{0} {1} {2} {3}".format(name, win_s, bar_s, pct))
+        if hidden:
+            lines.append(clip(t("more_n", hidden) + " · j/k", width))
+    lines.extend(tail)
+    return lines
+
+
+def render_page(model, page, width=36, offset=0, height=0):
+    width = max(28, int(width or 36))
+    budget = max(0, int(height) - 5) if height else 0
+    if page == "quota":
+        body = _quota_body(model, width, offset, budget)
     elif page == "tasks":
-        items = model.get("tasks") or []
-        if not items:
-            lines.append("没有任务")
-        else:
-            start = offset % len(items)
-            ordered = items[start:] + items[:start]
-            for item in ordered:
-                mark = "*" if item.get("waiting_you") else ("·" if not item.get("is_stale_record") else "!")
-                line = "{0} {1}  {2}  {3}".format(
-                    mark,
-                    item.get("state_label"),
-                    item.get("tool") or "",
-                    item.get("title") or "",
-                )
-                lines.append(clip(line, width))
-                extra = "  {0}  {1}".format(item.get("project") or "", item.get("age_label") or "")
-                if extra.strip():
-                    lines.append(clip(extra, width))
-        if model.get("hidden_tasks"):
-            lines.append("另有 {0} 条".format(model["hidden_tasks"]))
+        body = _tasks_body(model, width, offset, budget)
     elif page == "ask":
-        items = model.get("attention") or []
-        if not items:
-            lines.append("没有待处理")
-        else:
-            start = offset % len(items)
-            ordered = items[start:] + items[:start]
-            for item in ordered:
-                lines.append(
-                    clip(
-                        "* {0}  {1}  {2}".format(
-                            item.get("state_label"),
-                            item.get("tool") or "",
-                            item.get("title") or "",
-                        ),
-                        width,
-                    )
-                )
-                if item.get("computer_hint"):
-                    lines.append("  请在电脑处理")
-                if item.get("demo"):
-                    lines.append("  DEMO，不是真审批")
-        lines.append(clip("Q10 不提交审批 / 不做对话", width))
-    lines.append("-" * min(width, 42))
-    lines.append("1状态 2限额 3任务 4待处理  j/k  r刷新  x退出")
+        body = _ask_body(model, width, offset)
+    else:
+        body = []
+    if budget and len(body) > budget:
+        body = body[:budget]
+    lines = [_page_header(model, page, width), rule_line(width)]
+    lines.extend(body)
+    lines.append(rule_line(width))
+    foot = t("footer")
+    waiting = model.get("waiting") or 0
+    if waiting:
+        needle = t("ask")
+        idx = foot.rfind(needle)
+        if idx >= 0:
+            foot = foot[:idx] + "{0}({1})".format(needle, waiting) + foot[idx + len(needle):]
+    lines.append(clip(foot, width))
     return "\n".join(lines) + "\n"
 
 
@@ -950,17 +1826,27 @@ def default_source_times_path():
 
 
 def build_parser():
-    p = argparse.ArgumentParser(description="Q10 keyboard AI Monitor")
-    p.add_argument("--url", default="", help="snapshot URL; default guesses USB peer :8790")
-    p.add_argument("--once", action="store_true", help="print and exit")
-    p.add_argument("--all", action="store_true", help="print every page (implies --once)")
-    p.add_argument("--watch", action="store_true", help="refresh loop")
-    p.add_argument("--page", choices=PAGES, default="status")
-    p.add_argument("--demo", action="store_true", help="explicit DEMO fixture; never automatic")
-    p.add_argument("--file", default="", help="read snapshot from a JSON file")
-    p.add_argument("--source-times", default="", help="optional sidecar JSON")
+    p = argparse.ArgumentParser(description="Q10 键盘监视器")
+    p.add_argument(
+        "--url",
+        default="",
+        help="强制这一份快照 URL；不写则 last-good → USB/LAN 端口探测 → 信箱",
+    )
+    p.add_argument("--once", action="store_true", help="打一屏后退出")
+    p.add_argument("--all", action="store_true", help="三页都打（隐含 --once）")
+    p.add_argument("--watch", action="store_true", help="循环刷新")
+    p.add_argument("--page", choices=PAGES, default="quota")
+    p.add_argument("--demo", action="store_true", help="显式演示数据，不会自动回落")
+    p.add_argument("--file", default="", help="从 JSON 文件读快照")
+    p.add_argument("--source-times", default="", help="可选 sidecar JSON")
     p.add_argument("--interval", type=int, default=10)
     p.add_argument("--width", type=int, default=0)
+    p.add_argument(
+        "--lang",
+        choices=("en", "zh"),
+        default="zh",
+        help="界面语言，默认中文（任务标题本身也可能是中文）",
+    )
     return p
 
 
@@ -971,17 +1857,22 @@ def obtain_snapshot(args):
     if args.file:
         snap = load_json_file(args.file)
         return overlay_source_times(snap, load_source_times(args.source_times)), None
-    url = args.url or guess_hub_url()
-    snap = fetch_snapshot(url)
+    if args.url:
+        urls = [args.url]
+    else:
+        urls = list_hub_urls()
+    snap, url = fetch_first_snapshot(urls)
     overlay = load_source_times(args.source_times or default_source_times_path())
     return overlay_source_times(snap, overlay), url
 
 
 def main(argv=None):
     args = build_parser().parse_args(argv)
+    set_ui_lang(args.lang)
     if args.all:
         args.once = True
     width = args.width or term_width()
+    height = term_height()
     page = args.page
     offset = 0
     last = None
@@ -997,6 +1888,7 @@ def main(argv=None):
                 snap,
                 demo=args.demo,
                 source=url or args.file or "demo",
+                lang=args.lang,
             )
             return model, None
         except Exception as exc:
@@ -1004,14 +1896,14 @@ def main(argv=None):
 
     model, err = pull()
     if model is None:
-        model = unavailable_model("拉快照失败：{0}".format(err))
+        model = unavailable_model(t("fetch_fail", err))
         last = None
         if args.once:
             if args.all:
                 for name in PAGES:
-                    write_out(render_page(model, name, width=width))
+                    write_out(render_page(model, name, width=width, height=height))
             else:
-                write_out(render_page(model, page, width=width))
+                write_out(render_page(model, page, width=width, height=height))
             return 2
     else:
         last = model
@@ -1019,35 +1911,36 @@ def main(argv=None):
     if args.once:
         pages = PAGES if args.all else (page,)
         for name in pages:
-            write_out(render_page(model, name, width=width, offset=offset))
+            write_out(render_page(model, name, width=width, offset=offset, height=height))
         return 0 if model.get("schema_ok") else 2
+
+    # 启动时已有待处理：直接落在待处理页。
+    seen_ask = set()
+    jump, seen_ask = ask_jump(seen_ask, last or model)
+    if jump:
+        page = "ask"
 
     interval = max(2, int(args.interval))
     while True:
         shown = last or model
         if sys.stdout.isatty():
             clear_screen()
-        write_out(render_page(shown, page, width=width, offset=offset))
+        write_out(render_page(shown, page, width=width, offset=offset, height=height))
         sys.stdout.flush()
         key = None
+        wait = interval
+        if shown.get("offline"):
+            wait = min(interval, 4)
         if interactive and sys.stdin.isatty():
-            key = read_key(interval)
+            key = read_key(wait)
         else:
-            time.sleep(interval)
-            key = "r"
-        if key in ("x", "X", "q", "\x03"):
+            time.sleep(wait)
+            key = None
+        if key in ("x", "X", "q", "Q", "\x03"):
             return 0
-        if key in ("1",):
-            page, offset = "status", 0
-            continue
-        if key in ("2",):
-            page, offset = "quota", 0
-            continue
-        if key in ("3",):
-            page, offset = "tasks", 0
-            continue
-        if key in ("4",):
-            page, offset = "ask", 0
+        nxt_page = page_for_key(key)
+        if nxt_page:
+            page, offset = nxt_page, 0
             continue
         if key in ("j", "J", "n"):
             offset += 1
@@ -1055,14 +1948,18 @@ def main(argv=None):
         if key in ("k", "K", "p"):
             offset -= 1
             continue
-        if key in ("r", "R", None):
+        if is_refresh_key(key):
             nxt, err = pull()
             if nxt is not None:
                 last = nxt
+                # 刷新发现新的待处理：自动跳到待处理页。
+                jump, seen_ask = ask_jump(seen_ask, nxt)
+                if jump:
+                    page, offset = "ask", 0
             elif last is not None:
                 last = mark_offline(last)
             else:
-                last = unavailable_model("拉快照失败：{0}".format(err))
+                last = unavailable_model(t("fetch_fail", err))
 
 
 if __name__ == "__main__":

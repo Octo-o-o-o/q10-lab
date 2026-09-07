@@ -11,7 +11,8 @@
 Aindle registry
         │  collector.mjs
         ▼
-  127.0.0.1:8790  GET /snapshot.json   schema aindle.snapshot.v2
+  127.0.0.1:8787  GET /snapshot.json   schema aindle.snapshot.v2
+  （圆屏 collector 仍写死 8790；Q10 读 8787，不要再起抢端口的 8790 Hub）
         │
         ├─ USB Serial/JTAG ──► ESP32 LVGL（表盘 + 限额/任务/待处理 + BOOT PTT）
         └─ VoiceService / broker（STT + Agent 在 Mac）
@@ -25,7 +26,7 @@ Aindle registry
 
 | 面 | 圆屏 | Q10（第二阶段起） |
 |---|---|---|
-| 数据 | 读 8790 快照 | **同一份** `aindle.snapshot.v2` |
+| 数据 | 读 Hub 快照（圆屏 collector 仍指向 8790） | **同一份** `aindle.snapshot.v2`（Q10 读 8787） |
 | 呈现 | 466 圆屏，左右滑三页 | 720×720 + 物理键盘信息终端 |
 | 交互 | 触摸 + BOOT PTT | 键盘；PTT 以后用实机 API 验证 |
 | 智能 | 不在板上跑 LLM | 不在 QNX 上跑 Whisper / LLM |
@@ -35,7 +36,7 @@ Aindle registry
 
 ## 可以共用
 
-1. Host 事件模型与 8790 快照。
+1. Host 事件模型与 Hub 快照。
 2. 采集失败标 error/unknown，不写假的 0%。
 3. 语音：设备只出 PTT/PCM；STT/Agent 在电脑上。
 4. 「电脑在线才完整」的 tethered lab 假设。
@@ -52,18 +53,18 @@ Aindle registry
 | 部署 | `idf.py flash` | `blackberry-deploy` + 已签名 BAR |
 | 日常控制 | 串口 ACK | `./scripts/q10-shell.sh` |
 
-Q10 要读 8790，Mac 必须把 hub **绑到 Q10 能路由到的地址**（USB `169.254.0.2` 或双方都在的 Wi-Fi LAN）。只听 `127.0.0.1` 时手机摸不到。BB10 浏览器 TLS 很老，第一版用设备自带 `python3.2` 拉 HTTP，不要假设能开现代 HTTPS。
+Q10 要读 Aindle Hub，Mac 必须把 hub **绑到 Q10 能路由到的地址**（USB `169.254.0.2` 或双方都在的 Wi-Fi LAN）。只听 `127.0.0.1` 时手机摸不到。默认端口 `AINDLE_PORT=8787`；客户端探测 last-good 与 `Q10_HUB_PORTS`（8787、回退 8790），不要在本仓库另起 Hub。BB10 浏览器 TLS 很老；USB/LAN 用库存 `python3.2` 拉 HTTP。异地走 BerryCore `curl` + [MAILBOX.md](MAILBOX.md)，不要假设库存 HTTPS 能用。
 
 ## 已实测（2026-09-07）
 
-Q10 USB SSH 用 `python3.2` 拉 `http://169.254.0.2:8790/snapshot.json` 成功：
+Q10 USB SSH 用 `python3.2` 拉 Hub 快照成功（当时端口 8790；现默认 8787）：
 
 - schema `aindle.snapshot.v2`
 - hub `mini` / Mac mini
 - `staleHosts` 空
 - hosts / runs / subscriptions 都有真实条目
 
-本机 8790 当时同时听在 `127.0.0.1`、`169.254.0.2`、LAN。圆屏仍走串口；Q10 走 USB 网卡。同一份 JSON。
+本机 Hub 当时同时听在 `127.0.0.1`、`169.254.0.2`、LAN（端口当时 8790，现 8787）。圆屏仍走串口；Q10 走 USB 网卡。同一份 JSON。
 
 复查：`./scripts/q10-snapshot.sh`
 
@@ -75,4 +76,4 @@ Q10 USB SSH 用 `python3.2` 拉 `http://169.254.0.2:8790/snapshot.json` 成功�
 4. Q10 键盘监视器 **已落地**（Term49 / SSH TUI，`./scripts/q10-monitor.sh`）。主屏一键用 **`Z` → Term49**，见 `LAUNCH.md`。不做小 ChatGPT。
 5. 本机 PTT / 语音、Berry Browser、独立 sshd：**未对应**（语音要实机 API；Browser 要 root）。
 
-设备侧读 8790，**不读** Mac `/tmp/octoooo-mini-*/source-times.json`。没有 sidecar 时，缓存限额的年龄写「时间未知」，不用 Hub `generatedAt` 冒充采集时间。
+设备侧读 Hub `8787`，**不读** Mac `/tmp/octoooo-mini-*/source-times.json`。没有 sidecar 时，缓存限额的年龄写「时间未知」，不用 Hub `generatedAt` 冒充采集时间。

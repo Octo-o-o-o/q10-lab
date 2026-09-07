@@ -1,0 +1,21 @@
+#!/bin/sh
+# Term49 / SSH 共用入口。默认中文；任务标题本身也可能是中文。
+export LANG="${LANG:-en_US.UTF-8}"
+export LC_ALL="${LC_ALL:-en_US.UTF-8}"
+export PYTHONIOENCODING=utf-8
+if [ -f /accounts/1000/shared/misc/q10-mailbox.env ]; then
+  . /accounts/1000/shared/misc/q10-mailbox.env
+fi
+if [ -x /accounts/1000/shared/misc/q10-term49-font.sh ]; then
+  font_msg="$(/accounts/1000/shared/misc/q10-term49-font.sh 2>&1)" || true
+  case "$font_msg" in
+    *FONT_UPDATED*|*FONT_CREATED*)
+      echo "已写入中文字体。请完全划掉 Term49，再打开一次。"
+      echo "CJK font saved. Fully quit Term49 and open again."
+      ;;
+    *没有找到中文字体*)
+      echo "$font_msg"
+      ;;
+  esac
+fi
+exec /usr/bin/python3.2 /accounts/1000/shared/misc/q10-monitor.py --lang zh "$@"
