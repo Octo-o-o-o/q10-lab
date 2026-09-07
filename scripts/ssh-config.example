@@ -1,0 +1,22 @@
+# Optional snippet. Do not paste over other Host blocks.
+# Interactive `ssh q10-usb` may still lose KEX to /etc/ssh/crypto.conf.
+# Reliable path: ./scripts/q10-shell.sh (uses -F /dev/null).
+#
+# Dev Mode on this phone uses 169.254.0.1. Other unplugs have been
+# 169.254.57.113 and 169.254.134.221. Re-run detect after every unplug.
+
+Host q10-usb
+  HostName 169.254.0.1
+  User devuser
+  IdentitiesOnly yes
+  IdentityFile ~/.ssh/q10-usb
+  ProxyCommand none
+  StrictHostKeyChecking accept-new
+  UserKnownHostsFile ~/WorkSpace/q10-lab/local-config/known_hosts
+  UpdateHostKeys no
+  HostKeyAlgorithms ssh-rsa
+  PubkeyAcceptedAlgorithms ssh-rsa
+  KexAlgorithms diffie-hellman-group14-sha1
+  Ciphers aes128-ctr,aes192-ctr,aes256-ctr
+  MACs hmac-sha1
+  RequiredRSASize 1024

@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+set -euo pipefail
+HERE="$(cd "$(dirname "$0")" && pwd)"
+BB10="$(cd "${HERE}/.." && pwd)"
+exec java \
+  -Djava.security.properties="${BB10}/java.security.override" \
+  -Djdk.tls.client.protocols=TLSv1 \
+  -Dhttps.protocols=TLSv1 \
+  -jar "${BB10}/clt/lib/Connect.jar" "$@"

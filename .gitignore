@@ -1,0 +1,49 @@
+# Secrets and device credentials
+.env
+.env.local
+*.secret
+credentials/
+local-config/
+device-password*
+*.password
+
+# SSH private keys
+id_rsa*
+id_ed25519*
+*.pem
+*.ppk
+*.key
+
+# Personal / radio identifiers
+IMEI*
+imei*
+*meid*
+
+# Large proprietary installers, firmware, BAR payloads
+downloads/*
+!downloads/.gitkeep
+*.dmg
+*.exe
+*.msi
+*.run
+*.autoloader
+*.bar
+berrycore.zip
+
+# Extracted host tools and NDK trees (jars stay local)
+tools/bb10/**
+!tools/bb10/.gitkeep
+!tools/bb10/bin/
+!tools/bb10/bin/blackberry-deploy
+!tools/bb10/bin/blackberry-connect
+!tools/bb10/java.security.override
+tools/bb10/.extracted/
+
+# Runtime logs may contain device names or paths
+logs/*
+!logs/.gitkeep
+
+# OS junk
+.DS_Store
+Thumbs.db
+*.swp
