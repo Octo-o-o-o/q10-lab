@@ -5,6 +5,8 @@ import json
 import os
 import tempfile
 import unittest
+import sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from datetime import datetime
 
 from q10_monitor import (
@@ -675,6 +677,39 @@ class AdapterTests(unittest.TestCase):
             if os.path.isfile(path):
                 os.remove(path)
 
+
+class OctooooProjectionTests(unittest.TestCase):
+    def test_projection_expiry_and_minimum_content(self):
+        import tempfile
+        import octoooo_projection as projection
+        frame = {'schema': 'octoooo.display.v1', 'available': True, 'generated_at': 1000, 'expires_at': 31000, 'pending': 17, 'running': 1, 'completed': 0, 'body': 'NESTED_SECRET', 'usage': [{'provider': 'SECRET', 'account': 'SECRET', 'window': 'SECRET', 'value': 132, 'stale': True}, {'provider': 'codex', 'account': '账号 2', 'window': 'weekly', 'value': None, 'stale': True}]}
+        with tempfile.TemporaryDirectory() as folder:
+            path = os.path.join(folder, 'projection.json')
+            with open(path, 'w', encoding='utf-8') as stream:
+                json.dump(frame, stream)
+            value = projection.read_projection(path, 2000)
+            text = projection.render_projection(value)
+            self.assertIn('132%', text)
+            self.assertIn('未知', text)
+            self.assertNotIn('SECRET', text)
+            self.assertEqual(value['pending'], 17)
+            self.assertIsNone(projection.read_projection(path, 31001))
+
+    def test_projection_timezone_freshness_and_keyboard_pages(self):
+        import octoooo_projection as projection
+        from unittest.mock import patch
+        from types import SimpleNamespace
+        self.assertEqual(projection.sample_ms('2026-09-12T08:00:00+08:00'), projection.sample_ms('2026-09-12T00:00:00Z'))
+        self.assertIsNone(projection.sample_ms('not-a-time'))
+        value = {'synthetic': True, 'pending': 100, 'running': 1, 'completed': 2, 'usage': [
+            {'provider': 'codex', 'account': '账号 {0}'.format(i), 'window': 'weekly', 'percent': 132 if i == 16 else i, 'stale': True}
+            for i in range(17)]}
+        output = []
+        keys = iter(['N','P','K','Q'])
+        args = SimpleNamespace(octoooo_file='unused',once=False,all=False,interval=1)
+        with patch.object(projection, 'read_projection', return_value=value), patch.object(projection.sys.stdin, 'isatty', return_value=True):
+            self.assertEqual(projection.run_monitor(args, lambda timeout: next(keys), output.append, lambda: None),0)
+        self.assertIn('第 1/5 页',output[0]); self.assertIn('第 2/5 页',output[1]); self.assertIn('第 1/5 页',output[2]); self.assertIn('第 5/5 页',output[3]); self.assertIn('132%',output[3])
 
 if __name__ == "__main__":
     unittest.main()

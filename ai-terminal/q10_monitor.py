@@ -2274,6 +2274,7 @@ def build_parser():
     p.add_argument("--page", choices=PAGES, default="quota")
     p.add_argument("--demo", action="store_true", help="显式演示数据，不会自动回落")
     p.add_argument("--file", default="", help="从 JSON 文件读快照")
+    p.add_argument("--octoooo-file", default="", help="受限只读投影文件；不探测网络或读取信箱")
     p.add_argument("--source-times", default="", help="可选 sidecar JSON")
     p.add_argument("--interval", type=int, default=10)
     p.add_argument("--width", type=int, default=0)
@@ -2304,6 +2305,9 @@ def obtain_snapshot(args):
 
 def main(argv=None):
     args = build_parser().parse_args(argv)
+    if args.octoooo_file:
+        from octoooo_projection import run_monitor
+        return run_monitor(args, read_key, write_out, clear_screen)
     set_ui_lang(args.lang)
     if args.all:
         args.once = True
