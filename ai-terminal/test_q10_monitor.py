@@ -3,6 +3,9 @@
 """Adapter rules aligned with the ESP32 round-screen host/adapter.py."""
 import json
 import os
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 import tempfile
 import unittest
 from datetime import datetime
@@ -675,6 +678,51 @@ class AdapterTests(unittest.TestCase):
             if os.path.isfile(path):
                 os.remove(path)
 
+
+
+class OctooooProjectionTests(unittest.TestCase):
+    def test_recent_reset_usage_is_stale(self):
+        from q10_monitor import parse_iso
+        now = parse_iso("2026-09-13T01:00:00Z")
+        snapshot = {"schema":"octoooo.weak.v1","complete":True,"total":1,"valid_until":"2026-09-13T01:01:00Z","rows":[{"id":"q","kind":"usage","value":42,"stale":True,"observed_at":"2026-09-13T00:59:58Z"}]}
+        model = adapt(snapshot, now=now)
+        self.assertEqual(model["quota_items"][0]["confidence"], "stale")
+
+    def test_navigation_cannot_extend_projection_lease(self):
+        from unittest.mock import patch
+        from datetime import timedelta
+        import q10_monitor as q
+        start = datetime(2026, 9, 13, 1, 0)
+        snapshot = {"schema": "octoooo.weak.v1", "complete": True, "total": 1, "valid_until": "2026-09-13T01:01:00Z", "rows": [{"id": "q", "kind": "usage", "value": 42}]}
+        clock = [start]
+        frames = []
+        def key(wait):
+            clock[0] += timedelta(seconds=10)
+            return "1" if clock[0] < start + timedelta(seconds=80) else "q"
+        with patch.object(q, "utcnow", side_effect=lambda: clock[0]), patch.object(q, "obtain_snapshot", return_value=(snapshot, "fixture")) as fetch, patch.object(q, "read_key", side_effect=key), patch.object(q.sys.stdin, "isatty", return_value=True), patch.object(q.sys.stdout, "isatty", return_value=False), patch.object(q, "write_out", side_effect=frames.append):
+            self.assertEqual(q.main(["--watch", "--page", "quota"]), 0)
+        self.assertEqual(fetch.call_count, 1)
+        self.assertIn("42%", frames[0])
+        self.assertNotIn("42%", frames[-1])
+        self.assertIn("不可用", frames[-1])
+
+    def test_complete_readonly_projection_and_expiry(self):
+        from datetime import datetime, timedelta
+        import q10_monitor as q
+        now = datetime(2026, 9, 13, 1, 0)
+        snapshot = {"schema": "octoooo.weak.v1", "complete": True, "total": 3, "valid_until": "2026-09-13T01:01:00Z", "rows": [
+            {"id": "q", "kind": "usage", "value": 132, "observed_at": "2026-09-13T01:00:00Z"},
+            {"id": "s", "kind": "source", "status": "idle", "observed_at": None},
+            {"id": "a", "kind": "activity"}]}
+        model = q.adapt(snapshot, now=now)
+        self.assertTrue(model["schema_ok"])
+        self.assertEqual(model["quota_items"][0]["windows"][0]["used_pct"], 132)
+        self.assertEqual(model["tasks"][0]["state"], "idle")
+        self.assertTrue(model["attention"][0]["computer_hint"])
+        self.assertFalse(q.adapt(snapshot, now=now + timedelta(minutes=2))["schema_ok"])
+        self.assertEqual(q.mark_offline(model)["attention"], [])
+        snapshot["total"] = 4
+        self.assertFalse(q.adapt(snapshot, now=now)["schema_ok"])
 
 if __name__ == "__main__":
     unittest.main()

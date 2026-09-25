@@ -804,6 +804,8 @@ def unavailable_model(reason, demo=False):
 def mark_offline(model, reason=None):
     if reason is None:
         reason = t("offline_reason")
+    if model.get("octoooo_readonly"):
+        return octoooo_unavailable("Octoooo 连接中断，授权内容已清除")
     out = dict(model)
     out["offline"] = True
     out["freshness"] = t("offline")
@@ -811,6 +813,54 @@ def mark_offline(model, reason=None):
     stats = model.get("stats_line") or ""
     if t("offline") not in stats:
         out["stats_line"] = t("offline_prefix") + stats
+    return out
+
+
+def octoooo_unavailable(reason, demo=False):
+    model = unavailable_model(reason, demo=demo)
+    model["octoooo_readonly"] = True
+    return model
+
+
+def adapt_octoooo(snapshot, now, demo=False, source=""):
+    rows = snapshot.get("rows")
+    expires = parse_iso(snapshot.get("valid_until"))
+    if snapshot.get("complete") is not True or not isinstance(rows, list) or type(snapshot.get("total")) is not int or snapshot.get("total") != len(rows):
+        return octoooo_unavailable("Octoooo 快照不完整", demo=demo)
+    if expires is None or expires <= now:
+        return octoooo_unavailable("Octoooo 授权画面已过期，请刷新", demo=demo)
+    out = unavailable_model("只读投影；翻页不是已读，任务状态来自来源", demo=demo)
+    out.update({"schema_ok": True, "source": "Octoooo", "hub_label": "Octoooo", "url": source,
+                "freshness": "受限快照", "collected_label": "逐项显示采集时间", "octoooo_readonly": True,
+                "valid_until": snapshot.get("valid_until"), "stats_line": "共 {0} 项授权记录".format(len(rows))})
+    seen = set()
+    for row in rows:
+        if not isinstance(row, dict) or row.get("kind") not in ("usage", "source", "activity") or not isinstance(row.get("id"), str) or not row["id"]:
+            return octoooo_unavailable("Octoooo 记录无效", demo=demo)
+        identity = row["kind"] + ":" + row["id"]
+        if identity in seen:
+            return octoooo_unavailable("Octoooo 记录重复", demo=demo)
+        seen.add(identity)
+        observed = parse_iso(row.get("observed_at"))
+        fresh = row.get("stale") is not True and observed is not None and observed <= now and (now - observed).total_seconds() <= 60
+        age = _format_seen_age(observed, now) if observed is not None and observed <= now else t("time_unknown")
+        if row["kind"] == "usage":
+            value = row.get("value")
+            valid = type(value) in (int, float) and not math.isnan(value) and not math.isinf(value) and value >= 0
+            if valid:
+                value = int(round(value))
+            windows = [] if not valid else [{"key": str(row.get("window") or "窗口"), "key_label": str(row.get("window") or "窗口"), "used_pct": value, "used_label": t("used", value), "resets_label": "—"}]
+            out["quota_items"].append({"id": identity, "tool": str(row.get("provider") or "订阅"), "label": "授权窗口", "kind": "quota", "is_quota": True,
+                "octoooo_unknown": not valid, "confidence": "live" if fresh else "unknown" if observed is None else "stale", "status_label": t("live") if fresh else t("unknown"),
+                "windows": windows, "note": "未知不是零；超额值不截断", "source": "octoooo", "age_label": age})
+        elif row["kind"] == "source":
+            state = {"running": "active", "idle": "idle", "completed": "done", "failed": "fail", "needs_attention": "wait"}.get(row.get("status"), "unknown")
+            out["tasks"].append({"id": identity, "title": "来源观察", "project": "", "tool": "Octoooo", "state": state,
+                "state_label": {"active": "运行中", "idle": "空闲", "done": "已完成", "fail": "失败", "wait": "需要关注"}.get(state, "未知"),
+                "is_stale_record": not fresh, "waiting_you": state == "wait" and fresh, "octoooo": True, "host_id": "", "age_label": age})
+        else:
+            out["attention"].append({"id": identity, "title": "有事项可查看", "project": "", "tool": "Octoooo", "state_label": "只读", "host_id": "", "computer_hint": True, "demo": False})
+    out["waiting"] = len(out["attention"])
     return out
 
 
@@ -830,6 +880,8 @@ def adapt(
     clock = now or utcnow()
     if not isinstance(snapshot, dict):
         return unavailable_model(t("bad_object"), demo=demo)
+    if snapshot.get("schema") == "octoooo.weak.v1":
+        return adapt_octoooo(snapshot, clock, demo=demo, source=source)
     if snapshot.get("schema") != SNAPSHOT_SCHEMA:
         return unavailable_model(t("bad_schema", SNAPSHOT_SCHEMA), demo=demo)
 
@@ -1092,7 +1144,31 @@ def _fetch_curl(url, timeout, token):
     return json.loads(raw)
 
 
+def fetch_octoooo(url, binding_file, timeout=8):
+    import subprocess
+    import re
+    binding = load_json_file(binding_file)
+    if url != binding.get("url") or not url.startswith("https://") or "\n" in url or "\r" in url:
+        raise ValueError("Explicit matching HTTPS projection URL required")
+    device = binding.get("device_id", "")
+    token = binding.get("token", "")
+    if not re.match(r"^[a-z0-9][a-z0-9-]{1,62}$", device) or not re.match(r"^[A-Za-z0-9_.~-]{1,512}$", token):
+        raise ValueError("Invalid device binding")
+    parsed = _urlparse(url)
+    if parsed.username or parsed.password or parsed.query or parsed.fragment or parsed.path != "/projection.json":
+        raise ValueError("Projection URL must not contain credentials or query parameters")
+    config = 'header = "Authorization: Bearer {0}"\nheader = "x-octo-device-id: {1}"\n'.format(token, device)
+    child = subprocess.Popen([_curl_bin(), "--config", "-", "-sS", "-f", "-m", str(int(timeout)), url], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    raw, error = child.communicate(config.encode("utf-8"))
+    if child.returncode != 0:
+        raise IOError("Octoooo projection request rejected")
+    return json.loads(raw.decode("utf-8"))
+
+
 def fetch_snapshot(url, timeout=8):
+    binding_file = os.environ.get("Q10_OCTOOOO_BINDING_FILE")
+    if binding_file:
+        return fetch_octoooo(url, binding_file, timeout)
     token = _mailbox_token()
     if url.lower().startswith("https://"):
         return _fetch_curl(url, timeout, token)
@@ -1349,6 +1425,8 @@ def merge_ask_history(current, stored, live):
 
 
 def remember_attention(model):
+    if model and model.get("octoooo_readonly"):
+        return model
     if not model:
         return model
     live = bool(model.get("schema_ok") and not model.get("offline"))
@@ -1531,7 +1609,7 @@ def fetch_first_snapshot(urls, fetch_fn=None):
     for url in urls or []:
         try:
             snap = fetch_fn(url, fetch_timeout_for(url))
-            if isinstance(snap, dict) and snap.get("schema") == SNAPSHOT_SCHEMA:
+            if isinstance(snap, dict) and snap.get("schema") in (SNAPSHOT_SCHEMA, "octoooo.weak.v1"):
                 write_last_hub_url(url)
                 return snap, url
             last_err = ValueError("bad snapshot")
@@ -1609,6 +1687,8 @@ def leader_lr(left, right, width):
 
 
 def quota_pct_cell(item, win):
+    if item.get("octoooo_unknown"):
+        return "?"
     conf = item.get("confidence")
     if conf == "error":
         return t("cell_err")
@@ -1659,6 +1739,8 @@ def flatten_quota_rows(items):
         tool = quota_tool_cell(item, used)
         wins = item.get("windows") or []
         if not wins:
+            if item.get("octoooo_unknown"):
+                rows.append((item, None, tool))
             continue
         for win in wins:
             rows.append((item, win, tool))
@@ -2176,7 +2258,16 @@ def _quota_body(model, width, offset, budget):
     return lines
 
 
+def enforce_projection_lease(model, now=None):
+    if model.get("octoooo_readonly") and model.get("schema_ok"):
+        expires = parse_iso(model.get("valid_until"))
+        if expires is None or expires <= (now or utcnow()):
+            return octoooo_unavailable("Octoooo 授权画面已过期，请刷新")
+    return model
+
+
 def render_page(model, page, width=36, offset=0, height=0, task_filter=None):
+    model = enforce_projection_lease(model)
     width = max(28, int(width or 36))
     budget = max(0, int(height) - 5) if height else 0
     if task_filter is None:
@@ -2360,13 +2451,19 @@ def main(argv=None):
 
     interval = max(2, int(args.interval))
     while True:
-        shown = last or model
+        shown = enforce_projection_lease(last or model)
+        if last is not None:
+            last = shown
         if sys.stdout.isatty():
             clear_screen()
         write_out(render_page(shown, page, width=width, offset=offset, height=height, task_filter=task_filter))
         sys.stdout.flush()
         key = None
         wait = interval
+        if shown.get("octoooo_readonly") and shown.get("schema_ok"):
+            expires = parse_iso(shown.get("valid_until"))
+            if expires is not None:
+                wait = min(wait, max(0.01, (expires - utcnow()).total_seconds()))
         if shown.get("offline"):
             wait = min(interval, 4)
         if interactive and sys.stdin.isatty():
@@ -2410,3 +2507,4 @@ if __name__ == "__main__":
         sys.exit(main())
     except KeyboardInterrupt:
         sys.exit(0)
+
