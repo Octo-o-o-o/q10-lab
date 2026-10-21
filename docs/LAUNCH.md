@@ -58,4 +58,6 @@ SSH `devuser` **写不进** Term49 沙箱 `$HOME`，所以我不能在你不打�
 - 从 USB 改系统快捷键表（没有公开 API，也不 root）
 - 把 `1` 当空键（出厂语音信箱）
 - BerryCore `settings homescreen-on`（只往 `.profile` 塞 pin pack，不是键盘快捷键）
-- 独立 sshd、Berry Browser、设备侧 LLM / PTT
+- 独立 sshd、Berry Browser、设备侧 LLM
+
+下一步主界面是 Cascades Console（录音/通知）。未批准安装闸前日常仍是 `Z` → Term49。Mac 上可先看本仓 720 预览：`./scripts/q10-console-preview.sh`。见 [Cascades 方案](plan/2026-09-15-cascades-octoooo-surface-plan.md) 与 [两道闸](plan/2026-09-15-cascades-gates.md)。

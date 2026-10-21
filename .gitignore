@@ -27,6 +27,7 @@ downloads/*
 *.msi
 *.run
 *.autoloader
+*.7z
 *.bar
 berrycore.zip
 

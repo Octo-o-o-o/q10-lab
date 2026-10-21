@@ -1,0 +1,150 @@
+{
+  "schema": "q10.console.projection.v1",
+  "source_schema": "aindle.snapshot.v2",
+  "upstream": "aindle",
+  "freshness": "新鲜",
+  "offline": false,
+  "collected_label": "采集 1分钟前",
+  "waiting": 1,
+  "quota": [
+    {
+      "id": "cursor-demo",
+      "tool": "Cursor",
+      "label": "Cursor Demo",
+      "confidence": "cached",
+      "status_label": "缓存",
+      "windows": [
+        {
+          "key": "三方",
+          "label": "三方",
+          "used_pct": 100,
+          "resets_label": "周六 02:00"
+        },
+        {
+          "key": "自有",
+          "label": "自有",
+          "used_pct": 22,
+          "resets_label": "周六 02:00"
+        }
+      ]
+    },
+    {
+      "id": "claude-demo",
+      "tool": "Claude",
+      "label": "Claude · Demo",
+      "confidence": "live",
+      "status_label": "新鲜",
+      "windows": [
+        {
+          "key": "5h",
+          "label": "5h",
+          "used_pct": 12,
+          "resets_label": "16:00"
+        },
+        {
+          "key": "7d",
+          "label": "7d",
+          "used_pct": 64,
+          "resets_label": "周一 13:59"
+        }
+      ]
+    },
+    {
+      "id": "kimi-demo",
+      "tool": "Kimi",
+      "label": "Kimi Demo",
+      "confidence": "live",
+      "status_label": "新鲜",
+      "windows": [
+        {
+          "key": "5h",
+          "label": "5h",
+          "used_pct": 0,
+          "resets_label": "16:30"
+        },
+        {
+          "key": "7d",
+          "label": "7d",
+          "used_pct": 8,
+          "resets_label": "周五 15:00"
+        }
+      ]
+    }
+  ],
+  "spend": [
+    {
+      "id": "deepseek-demo",
+      "tool": "DeepSeek",
+      "label": "余额 ¥12.34"
+    }
+  ],
+  "tasks": [
+    {
+      "id": "octoooo-live",
+      "title": "Contract upgrade 1.1.0",
+      "project": "Octoooo",
+      "tool": "Claude",
+      "state": "active",
+      "state_label": "进行中",
+      "waiting_you": false,
+      "is_stale_record": false
+    },
+    {
+      "id": "wait-live",
+      "title": "需要你确认下一步",
+      "project": "DemoApp",
+      "tool": "Claude",
+      "state": "wait",
+      "state_label": "等你",
+      "waiting_you": true,
+      "is_stale_record": false
+    },
+    {
+      "id": "fake-wait",
+      "title": "derived wait 不能标等你",
+      "project": "Other",
+      "tool": "Grok",
+      "state": "wait",
+      "state_label": "等待",
+      "waiting_you": false,
+      "is_stale_record": false
+    },
+    {
+      "id": "long-title",
+      "title": "这是一条用来检查圆屏裁剪的超长中文任务标题需要被省略号截断而不是画出圆外ABCDEFG",
+      "project": "RoundScreenDemo",
+      "tool": "Claude",
+      "state": "idle",
+      "state_label": "空闲",
+      "waiting_you": false,
+      "is_stale_record": false
+    },
+    {
+      "id": "stale-active",
+      "title": "过期主机上的活跃会话",
+      "project": "Legacy",
+      "tool": "Claude",
+      "state": "active",
+      "state_label": "旧记录",
+      "waiting_you": false,
+      "is_stale_record": true
+    }
+  ],
+  "attention": [
+    {
+      "id": "demo-confirm",
+      "title": "确认发布计划",
+      "project": "演示",
+      "tool": "Claude",
+      "computer_hint": true
+    },
+    {
+      "id": "wait-live",
+      "title": "需要你确认下一步",
+      "project": "DemoApp",
+      "tool": "Claude",
+      "computer_hint": true
+    }
+  ],
+  "note": "演示数据，非本机实时 · 口径：窗口已用% · 账户不合计 · 余额非限额"
+}

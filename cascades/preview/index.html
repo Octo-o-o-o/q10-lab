@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=720, height=720, user-scalable=no">
+<title>Q10 Console 预览</title>
+<style>
+html,body{margin:0;background:#0b101c;color:#e8eaed;font:20px/1.35 "PingFang SC","Hiragino Sans GB","Noto Sans CJK SC","Noto Sans SC","Heiti SC",sans-serif;}
+#app{width:720px;height:720px;box-sizing:border-box;padding:20px 22px 16px;overflow:hidden;}
+h1{margin:0;font-size:22px;font-weight:600;}
+.meta{color:#9aa3ad;font-size:16px;margin:6px 0 14px;}
+.row{display:block;margin:0 0 10px;padding:10px 12px;background:#121826;border-radius:8px;}
+.tool{color:#6ea8fe;}
+.pct{float:right;}
+.old{color:#8b7355;}
+.err{color:#e8bc78;}
+.mark{color:#6ea8fe;}
+.foot{position:absolute;left:22px;right:22px;bottom:16px;color:#9aa3ad;font-size:16px;}
+.bar{height:8px;background:#1c2436;margin-top:6px;border-radius:4px;overflow:hidden;}
+.fill{height:8px;background:#6ea8fe;}
+.fill.hot{background:#e8bc78;}
+.fill.over{background:#e06666;}
+.empty{color:#9aa3ad;margin-top:48px;text-align:center;}
+</style>
+</head>
+<body>
+<div id="app">
+  <h1 id="title">限额</h1>
+  <div class="meta" id="meta">加载中…</div>
+  <div id="body"></div>
+  <div class="foot" id="foot">Q限额 2任务 3待处理 · 演示数据 · 未接 Octoooo</div>
+</div>
+<script>
+var PAGE = "quota";
+var DATA = null;
+function $(id){ return document.getElementById(id); }
+function esc(s){
+  return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+}
+function bar(pct){
+  var n = pct == null ? 0 : Number(pct);
+  var w = n < 0 ? 0 : (n > 100 ? 100 : n);
+  var cls = n >= 100 ? "over" : (n > 90 ? "hot" : "");
+  var label = pct == null ? "—" : (String(n) + "%");
+  return '<div class="bar"><div class="fill '+cls+'" style="width:'+w+'%"></div></div><span class="pct">'+esc(label)+'</span>';
+}
+function render(){
+  if (!DATA){ $("meta").innerHTML = "没有投影"; return; }
+  var names = {quota:"限额", tasks:"任务", ask:"待处理"};
+  $("title").innerHTML = names[PAGE] || PAGE;
+  $("meta").innerHTML = esc((DATA.freshness||"") + " · " + (DATA.collected_label||""));
+  var html = "";
+  if (PAGE === "quota"){
+    var i, j, q, w;
+    if (!DATA.quota || !DATA.quota.length){
+      html = '<div class="empty">没有限额条目</div>';
+    } else {
+      for (i=0;i<DATA.quota.length;i++){
+        q = DATA.quota[i];
+        html += '<div class="row"><span class="tool">'+esc(q.tool)+'</span> '+esc(q.status_label);
+        for (j=0;j<(q.windows||[]).length;j++){
+          w = q.windows[j];
+          html += '<div>'+esc(w.label||w.key)+" "+bar(w.used_pct)+"</div>";
+        }
+        html += "</div>";
+      }
+    }
+    if (DATA.spend && DATA.spend.length){
+      html += '<div class="row err">花费 ≠ 限额';
+      for (i=0;i<DATA.spend.length;i++){
+        html += '<div>'+esc(DATA.spend[i].tool)+" · "+esc(DATA.spend[i].label)+"</div>";
+      }
+      html += "</div>";
+    }
+  } else if (PAGE === "tasks"){
+    if (!DATA.tasks || !DATA.tasks.length){
+      html = '<div class="empty">没有任务</div>';
+    } else {
+      for (i=0;i<DATA.tasks.length;i++){
+        var t = DATA.tasks[i];
+        html += '<div class="row'+(t.is_stale_record?" old":"")+'">';
+        html += (t.waiting_you?'<span class="mark">● </span>':'');
+        html += esc(t.state_label)+" "+esc(t.title);
+        html += '<div class="meta">'+esc(t.project||"")+" · "+esc(t.tool)+"</div></div>";
+      }
+    }
+  } else {
+    if (!DATA.attention || !DATA.attention.length){
+      html = '<div class="empty">没有待处理<br>请在电脑处理</div>';
+    } else {
+      for (i=0;i<DATA.attention.length;i++){
+        var a = DATA.attention[i];
+        html += '<div class="row"><span class="mark">● </span>'+esc(a.title);
+        html += '<div class="meta">请在电脑处理 · '+esc(a.tool)+"</div></div>";
+      }
+    }
+  }
+  $("body").innerHTML = html;
+  var wait = DATA.waiting ? "待处理("+DATA.waiting+")" : "待处理";
+  var src = DATA.offline ? "离线" : (DATA.upstream||"aindle");
+  $("foot").innerHTML = "Q限额 2任务 3"+wait+" · "+esc(src)+" · 未接 Octoooo";
+}
+function load(){
+  var x = new XMLHttpRequest();
+  x.open("GET", "/projection.json", true);
+  x.onreadystatechange = function(){
+    if (x.readyState !== 4) return;
+    if (x.status !== 200){ $("meta").innerHTML = "投影不可用 "+x.status; return; }
+    try { DATA = JSON.parse(x.responseText); } catch (e){ $("meta").innerHTML = "投影不是 JSON"; return; }
+    render();
+  };
+  x.send(null);
+}
+document.onkeydown = function(ev){
+  var k = ev.keyCode;
+  if (k===81) PAGE="quota";
+  else if (k===50||k===69) PAGE="tasks";
+  else if (k===51||k===82||k===52||k===83) PAGE="ask";
+  else if (k===84) { load(); return; }
+  else return;
+  render();
+};
+load();
+</script>
+</body>
+</html>

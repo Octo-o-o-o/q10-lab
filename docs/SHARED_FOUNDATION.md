@@ -74,6 +74,6 @@ Q10 USB SSH 用 `python3.2` 拉 Hub 快照成功（当时端口 8790；现默认
 2. Term49：已装，用户确认本机键盘 + 元模式可用。
 3. BerryCore userland **已装**到 `shared/misc/berrycore`。不 root、未装 Browser BAR。
 4. Q10 键盘监视器 **已落地**（Term49 / SSH TUI，`./scripts/q10-monitor.sh`）。主屏一键用 **`Z` → Term49**，见 `LAUNCH.md`。不做小 ChatGPT。
-5. 本机 PTT / 语音、Berry Browser、独立 sshd：**未对应**（语音要实机 API；Browser 要 root）。
+5. **主界面改 Cascades「Q10 Console」**（2026-09-15）：录音/通知走官方 API。Term49 留下降级。C1 先走本仓 `cascades/preview/`（Aindle / 夹具）。Octoooo 合同后接。Berry Browser、独立 sshd、设备侧 LLM 仍不做。PTT 以 Console `AudioRecorder` 为准，尚未真机验收。正本 `docs/plan/2026-09-15-cascades-octoooo-surface-plan.md`，闸门 `docs/plan/2026-09-15-cascades-gates.md`。
 
 设备侧读 Hub `8787`，**不读** Mac `/tmp/octoooo-mini-*/source-times.json`。没有 sidecar 时，缓存限额的年龄写「时间未知」，不用 Hub `generatedAt` 冒充采集时间。

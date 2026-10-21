@@ -11,7 +11,9 @@
 | BerryCore install.sh | https://github.com/sw7ft/BerryCore/releases/download/v0.90.1/install.sh | GitHub digest `sha256:452d91947da6cd8e178772dc62f50d9f07670f5e930f73389473cb02a16d8eba` | 12831 bytes。**2026-09-07 已下并跑** |
 | Term49 latest | https://github.com/BerryFarm/Term49/releases/download/0.4.1.7/Term49.bar | **0.4.1.7**（2021-04-01） | size 3497186，SHA256 `48156c7b09edee42dc028484f862a048c9601c5859a407c3d5ba27a2e9913022`。生产签名（Development-Mode false）。**2026-09-07 已安装**，`listInstalledApps` 可见 `com.example.Term49`，`result::success`，已 `-launchApp` |
 | Momentics IDE Mac | https://archive.org/download/native-SDK-for-blackberry10/Momentics%20IDE/momentics-2.1.2-201503050937.macosx.x86_64.dmg | 2.1.2-201503050937 | 2026-09-07 已下。size 407625099，MD5/SHA1 与 IA 一致，SHA256 `3c801d2f26cb8452331507325503d635518c0375e35e392b165d613c5b52f8bb`。IDE 本身不含 NDK host 目录；CLI 在 `plugins/com.qnx.tools.bbt.clt_2.0.0.v201412090104`：`BarDeploy.jar` 1.5.0、`Connect.jar` 1.2.0 |
-| Win32 NDK tools（备援，非本机 USB 首选） | https://archive.org/download/bbdevtools/bbndk.win32.tools.10.3.1.12.zip | 10.3.1.12 | 仅 Windows host。Mac 阶段不执行其中的 exe |
+| Win32 NDK tools | https://archive.org/download/bbdevtools/bbndk.win32.tools.10.3.1.12.zip | 10.3.1.12 | 2026-09-15 Windows 已下并校验。size 304910772，SHA256 `c10a1bf0be7d0f5fce58ab6c6b8d9f09819185bcd58d13b78fce8399f37dd237`。Mac 不执行其中的 exe |
+| Win32 NDK libraries | https://archive.org/download/bbdevtools/bbndk.win32.libraries.10.3.1.995.zip | 10.3.1.995 | 2026-09-15 Windows 已下并校验。size 1607600440，SHA256 `0b2fd17e62eee6890ca0d470487bc2467ec97432538d04a7a1a299683978a33e` |
+| Win32 NDK qconfigmk | https://archive.org/download/bbdevtools/bbndk.win32.qconfigmk.10.3.1.995.zip | 10.3.1.995 | 2026-09-15 Windows 已下并校验。size 5492，SHA256 `97cf4b34af5af9b34365c33cdadcc08b6af20a34a7603f44fef4bd1d9384fe7d` |
 | BB10 官方服务 EOL | https://www.blackberry.com/en/secure-communications/support/end-of-life | 2022-01-04 | Link / 云端 / 电话短信不可依赖。只要本地 USB 工具 |
 
 ## Host tools 冲突
@@ -58,3 +60,9 @@
 - 教程里写死的 BerryCore v0.6 / v0.72
 - 随机网盘 Autoloader / pre-rooted ROM
 - 未校验哈希的 NDK 可执行文件
+
+## 2026-09-15 Cascades 主界面
+
+已采纳 `cascades/`（`com.q10lab.console`）。C2：Windows 上 IA win32 NDK 已校验并解到 `C:\q10-lab\ndk\bbndk`。`qcc -V` 列出 4.6.3/4.8.3 armv7/x86；`qmake` 见 Qt 4.8.6；`qcc -V4.8.3,gcc_ntoarmv7le` 编出 ELF32 ARM。C3：未签名 `-devMode` `downloads/console-0.0.1.bar`。C4：未签名 `downloads/console-0.0.2.bar`（SHA256 `f8e3651546f85dd5ae61a869362daf61f3de19cee510bfe9f0ff4d4b916dafce`）。未批准 C7，真机不 `-installApp`。正本 `docs/plan/2026-09-15-cascades-gates.md`。
+
+C7 选 **B**（炮灰机）。G0 3216 官方 7z 期望哈希见 `checksums/q10-10.3.3.3216-autoloader.md`。2026-09-15：`lunarproject.org` 已停；现活目录是 MEGA `ERomDKaT`。**7z 尚未本机校验。** 不要用 IA 10.3.3.498。

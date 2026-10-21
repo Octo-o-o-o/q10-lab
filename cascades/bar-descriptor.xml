@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<qnx xmlns="http://www.qnx.com/schemas/application/1.0">
+    <id>com.q10lab.console</id>
+    <name>Q10 Console</name>
+    <versionNumber>0.0.2</versionNumber>
+    <buildId>2</buildId>
+    <description>Octoooo weak surface for BlackBerry Q10. Interface, not Intelligence.</description>
+    <author>q10-lab</author>
+    <asset path="icon.png">icon.png</asset>
+    <asset path="assets">assets</asset>
+    <asset path="o.le-v7/console.so" entry="true" type="Qnx/Elf">console.so</asset>
+    <initialWindow>
+        <systemChrome>none</systemChrome>
+        <transparent>false</transparent>
+        <autoOrients>false</autoOrients>
+        <aspectRatio>portrait</aspectRatio>
+    </initialWindow>
+    <permission system="true">run_native</permission>
+    <permission>access_internet</permission>
+    <permission>access_shared</permission>
+    <permission>record_audio</permission>
+    <permission>post_notification</permission>
+    <permission>run_when_backgrounded</permission>
+    <env var="LD_LIBRARY_PATH" value="app/native/lib:/usr/lib/qt4/lib"/>
+</qnx>

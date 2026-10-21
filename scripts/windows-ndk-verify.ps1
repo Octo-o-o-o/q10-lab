@@ -1,0 +1,17 @@
+$ErrorActionPreference = "Stop"
+$env:QNX_BASE = "C:\q10-lab\ndk\bbndk"
+$env:QNX_HOST = "C:\q10-lab\ndk\bbndk\host_10_3_1_12\win32\x86"
+$env:QNX_TARGET = "C:\q10-lab\ndk\bbndk\target_10_3_1_995\qnx6"
+$env:QNX_CONFIGURATION = Join-Path $env:LOCALAPPDATA "Research In Motion\BlackBerry Native SDK"
+$env:MAKEFLAGS = "-I$($env:QNX_TARGET)\usr\include"
+$env:CPUVARDIR = "armle-v7"
+$env:PATH = "$($env:QNX_HOST)\usr\bin;$($env:PATH)"
+Write-Output "QNX_HOST=$($env:QNX_HOST)"
+Write-Output "QNX_TARGET=$($env:QNX_TARGET)"
+Set-Content -Path "C:\q10-lab\ndk\hello.c" -Value "int main(void){return 0;}`n"
+& qcc.exe "-V4.8.3,gcc_ntoarmv7le" -o "C:\q10-lab\ndk\hello" "C:\q10-lab\ndk\hello.c"
+if ($LASTEXITCODE -ne 0) { throw "qcc hello failed $LASTEXITCODE" }
+Write-Output "QCC_HELLO=0"
+Get-Item "C:\q10-lab\ndk\hello" | Format-List Name, Length
+& ntoarmv7-readelf.exe -h "C:\q10-lab\ndk\hello"
+Write-Output "VERIFY_OK"

@@ -48,7 +48,7 @@ Q10 在这套系统里只负责**看和按**：720×720 屏幕 + 物理键盘，
 
 ### 当前状态
 
-**Phase 1 完成**（tag `q10-clean-baseline`）。真机已装 Term49 0.4.1.7、BerryCore v0.90.1、键盘监视器。未批准禁止 wipe / Autoloader / 升降级 / root。Berry Browser 要 root，不装。
+**Phase 1 完成**（tag `q10-clean-baseline`）。真机已装 Term49 0.4.1.7、BerryCore v0.90.1、键盘监视器。未批准禁止 wipe / Autoloader / 升降级 / root。Berry Browser 要 root，不装。Cascades C4 未签名 BAR 已编出（`downloads/console-0.0.2.bar`），C7 选炮灰机，**不装这台 SQN100-3**。G0 3216 官方包哈希已交叉，7z 尚未本机校验。
 
 | 项 | 值 |
 |---|---|
@@ -121,6 +121,7 @@ python3 scripts/q10-render-demo.py
 | `docs/images/` | README 演示图；真机实拍也可放这里 |
 | `scripts/` | 检测 / 连接 / 部署 / 健康检查 / 监视器推送（另有 `.ps1` 备援） |
 | `ai-terminal/` | 键盘 AI Monitor（python3.2 TUI，读 8787） |
+| `cascades/` | Console 工程契约；`preview/` 是本仓 720 页（不接 Octoooo） |
 | `mailbox/` | 异地只读快照 Worker（HTTPS + token） |
 | `checksums/` | 安装包期望哈希；BAR / zip 不进 Git |
 | `baselines/` | 干净基线与应用清单 |
@@ -129,7 +130,13 @@ python3 scripts/q10-render-demo.py
 | `tools/bb10/` | 解压后的 host tools，不提交（包装脚本在仓内） |
 | `local-config/` | 密码、token、本机字体，不提交 |
 
-更细的笔记：[USB](docs/USB.md) · [Bring-up](docs/BRINGUP.md) · [基线](docs/Q10_BASELINE.md) · [Golden](docs/GOLDEN_BASELINE.md) · [BerryCore](docs/BERRYCORE.md) · [监视器选项](docs/AI_TERMINAL_OPTIONS.md) · [信箱](docs/MAILBOX.md) · [来源](docs/SOURCES.md)
+更细的笔记：[USB](docs/USB.md) · [Bring-up](docs/BRINGUP.md) · [基线](docs/Q10_BASELINE.md) · [Golden](docs/GOLDEN_BASELINE.md) · [BerryCore](docs/BERRYCORE.md) · [监视器选项](docs/AI_TERMINAL_OPTIONS.md) · [Cascades 主界面方案](docs/plan/2026-09-15-cascades-octoooo-surface-plan.md) · [两道闸](docs/plan/2026-09-15-cascades-gates.md) · [信箱](docs/MAILBOX.md) · [来源](docs/SOURCES.md)
+
+本仓 720 预览（不改 Octoooo）：
+
+```sh
+./scripts/q10-console-preview.sh
+```
 
 ---
 
@@ -179,6 +186,7 @@ Enable Developer Mode on the phone and set a device password first.
 ./scripts/q10-send.sh             # push a script to /var/tmp, optional --run
 ./scripts/q10-monitor.sh --local  # Mac preview of the same 8787 hub
 ./scripts/q10-monitor.sh --local --demo   # fixture pages, no live hub
+./scripts/q10-console-preview.sh  # in-repo 720 page on :8786, no Octoooo
 ./scripts/q10-monitor.sh          # push to the phone and print one frame over USB SSH
 ./scripts/q10-mailbox-push.sh --loop      # away-from-home: publish 8787 to the mailbox
 ./scripts/q10-launch.sh           # bring Term49 to the foreground
@@ -223,6 +231,7 @@ python3 scripts/q10-render-demo.py
 | `docs/images/` | README demos; real-device photos can live here too |
 | `scripts/` | Detect / connect / deploy / health / monitor push (`.ps1` fallbacks exist) |
 | `ai-terminal/` | Keyboard AI Monitor (python3.2 TUI, reads 8787) |
+| `cascades/` | Console contract; `preview/` is the in-repo 720 page (Octoooo later) |
 | `mailbox/` | Read-only remote snapshot Worker (HTTPS + token) |
 | `checksums/` | Expected hashes; BAR / zip files stay out of Git |
 | `baselines/` | Clean baseline and app lists |
