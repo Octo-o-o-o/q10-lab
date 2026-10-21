@@ -241,3 +241,5 @@ python3 scripts/q10-render-demo.py
 | `local-config/` | Passwords, tokens, local fonts, not committed |
 
 Deeper notes: [USB](docs/USB.md) · [Bring-up](docs/BRINGUP.md) · [Baseline](docs/Q10_BASELINE.md) · [Golden](docs/GOLDEN_BASELINE.md) · [BerryCore](docs/BERRYCORE.md) · [Monitor options](docs/AI_TERMINAL_OPTIONS.md) · [Mailbox](docs/MAILBOX.md) · [Sources](docs/SOURCES.md)
+
+r6 隔离候选的 Octoooo 只读输入、测试与恢复边界见 [Q10 profile](docs/r6-device-profile.md)。不改变原仓正在使用的 Term49 配置。
